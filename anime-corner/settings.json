@@ -1,0 +1,19 @@
+{
+  "panelDetached": true,
+  "panelPosition": "left",
+  "panelHeightRatio": 0.85,
+  "panelWidth": 520,
+  "attachmentStyle": "connected",
+  "scale": 1,
+  "booru": {
+    "provider": "yandere",
+    "safeOnly": true,
+    "randomOrder": false,
+    "pageSize": 20,
+    "saveDirectory": "",
+    "wallpaperCommand": "qs -c noctalia-shell ipc call wallpaper set {file} \"\"",
+    "imagesPerRow": 2,
+    "recentSearchTagLimit": 20,
+    "danbooruTagIndexRefreshDays": 7
+  }
+}

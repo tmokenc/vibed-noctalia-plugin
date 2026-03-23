@@ -1,0 +1,31 @@
+{
+  "id": "kanshi-manager",
+  "name": "Kanshi Manager",
+  "version": "0.1.0",
+  "minNoctaliaVersion": "4.6.0",
+  "author": "OpenAI",
+  "license": "MIT",
+  "repository": "https://github.com/tmokenc/vibed-noctalia-plugin",
+  "description": "Manage kanshi profiles, inspect current Niri outputs, and toggle outputs on or off.",
+  "entryPoints": {
+    "barWidget": "BarWidget.qml",
+    "controlCenterWidget": "ControlCenterWidget.qml",
+    "panel": "Panel.qml",
+    "settings": "Settings.qml"
+  },
+  "dependencies": {
+    "plugins": []
+  },
+  "metadata": {
+    "defaultSettings": {
+      "pythonCommand": "python3",
+      "niriCommand": "niri",
+      "kanshictlCommand": "kanshictl",
+      "configPath": "",
+      "panelWidth": 1180,
+      "panelHeight": 720,
+      "autoReloadOnStartup": true,
+      "barPollMs": 8000
+    }
+  }
+}

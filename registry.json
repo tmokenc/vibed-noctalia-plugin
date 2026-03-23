@@ -6,7 +6,7 @@
       "name": "Anime Corner",
       "version": "0.1.0",
       "official": false,
-      "author": "OpenGPI",
+      "author": "OpenAI",
       "description": "Anime art and wallpaper browser for booru image boards",
       "repository": "https://github.com/tmokenc/vibed-noctalia-plugin",
       "minNoctaliaVersion": "4.1.2",
@@ -18,7 +18,7 @@
         "Wallpaper",
         "Network"
       ],
-      "lastUpdated": "2026-03-23T22:40:46+01:00"
+      "lastUpdated": "2026-03-23T22:56:07+01:00"
     },
     {
       "id": "kanshi-manager",

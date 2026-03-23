@@ -23,6 +23,7 @@ Item {
   property bool randomOrder: pluginApi?.pluginSettings?.booru?.randomOrder ?? pluginApi?.manifest?.metadata?.defaultSettings?.booru?.randomOrder ?? false
   property int pageSize: pluginApi?.pluginSettings?.booru?.pageSize || pluginApi?.manifest?.metadata?.defaultSettings?.booru?.pageSize || 20
   property int imagesPerRow: pluginApi?.pluginSettings?.booru?.imagesPerRow || pluginApi?.manifest?.metadata?.defaultSettings?.booru?.imagesPerRow || 2
+  property bool variableCardSize: pluginApi?.pluginSettings?.booru?.variableCardSize ?? pluginApi?.manifest?.metadata?.defaultSettings?.booru?.variableCardSize ?? true
   property int recentSearchTagLimit: pluginApi?.pluginSettings?.booru?.recentSearchTagLimit ?? pluginApi?.manifest?.metadata?.defaultSettings?.booru?.recentSearchTagLimit ?? 20
   property int danbooruTagIndexRefreshDays: pluginApi?.pluginSettings?.booru?.danbooruTagIndexRefreshDays ?? pluginApi?.manifest?.metadata?.defaultSettings?.booru?.danbooruTagIndexRefreshDays ?? 7
   readonly property string configuredSaveDirectory: pluginApi?.pluginSettings?.booru?.saveDirectory || pluginApi?.manifest?.metadata?.defaultSettings?.booru?.saveDirectory || ""
@@ -1250,6 +1251,218 @@ Item {
     openViewerProcess.running = true;
   }
 
+  Component {
+    id: imageCardComponent
+
+    Rectangle {
+      id: imageCard
+      property var imageData: null
+      property bool imageQueued: !!root.isImageQueued(imageData)
+      readonly property real innerWidth: Math.max(width - Style.marginS * 2, 1)
+      readonly property real fallbackThumbnailHeight: Math.max(110, innerWidth * 0.62)
+      readonly property real aspectThumbnailHeight: {
+        var imageWidth = Number(imageData && imageData.width || 0);
+        var imageHeight = Number(imageData && imageData.height || 0);
+        if (imageWidth > 0 && imageHeight > 0)
+          return Math.max(110, innerWidth * imageHeight / imageWidth);
+        return fallbackThumbnailHeight;
+      }
+      readonly property real thumbnailHeight: root.variableCardSize ? aspectThumbnailHeight : fallbackThumbnailHeight
+
+      width: 240
+      height: implicitHeight
+      implicitHeight: contentColumn.implicitHeight + Style.marginS * 2
+      radius: Style.radiusS
+      color: Color.mSurfaceVariant
+      border.color: Color.mOutline
+      border.width: 1
+      clip: true
+
+      Behavior on x {
+        NumberAnimation {
+          duration: 140
+          easing.type: Easing.OutCubic
+        }
+      }
+
+      Behavior on y {
+        NumberAnimation {
+          duration: 140
+          easing.type: Easing.OutCubic
+        }
+      }
+
+      Behavior on height {
+        NumberAnimation {
+          duration: 120
+          easing.type: Easing.OutCubic
+        }
+      }
+
+      onImplicitHeightChanged: Qt.callLater(function() {
+        if (typeof imageMasonry !== "undefined" && imageMasonry)
+          imageMasonry.scheduleRelayout();
+      })
+
+      ColumnLayout {
+        id: contentColumn
+        x: Style.marginS
+        y: Style.marginS
+        width: parent.width - Style.marginS * 2
+        spacing: Style.marginS
+
+        Rectangle {
+          Layout.fillWidth: true
+          Layout.preferredHeight: parent.parent.thumbnailHeight
+          radius: Style.radiusS
+          color: Color.mSurface
+          clip: true
+
+          Image {
+            id: thumbImage
+            anchors.fill: parent
+            anchors.margins: 1
+            source: (imageCard.imageData && (imageCard.imageData.preview_url || imageCard.imageData.sample_url || imageCard.imageData.file_url)) || ""
+            asynchronous: true
+            cache: true
+            fillMode: root.variableCardSize ? Image.PreserveAspectFit : Image.PreserveAspectCrop
+            smooth: true
+          }
+
+          Rectangle {
+            anchors.fill: parent
+            color: Color.mSurface
+            opacity: thumbImage.status === Image.Ready ? 0 : 0.92
+            visible: thumbImage.status === Image.Loading || thumbImage.status === Image.Null || thumbImage.status === Image.Error
+
+            ColumnLayout {
+              anchors.centerIn: parent
+              spacing: Style.marginS
+
+              NIcon {
+                Layout.alignment: Qt.AlignHCenter
+                icon: thumbImage.status === Image.Error ? "image-off" : "loader-2"
+                color: Color.mOnSurfaceVariant
+                pointSize: Style.fontSizeL
+                applyUiScale: false
+
+                RotationAnimation on rotation {
+                  from: 0
+                  to: 360
+                  duration: 900
+                  loops: Animation.Infinite
+                  running: thumbImage.status === Image.Loading
+                }
+              }
+            }
+          }
+
+          MouseArea {
+            anchors.fill: parent
+            acceptedButtons: Qt.LeftButton | Qt.RightButton
+            cursorShape: Qt.PointingHandCursor
+            onClicked: function(mouse) {
+              if (mouse.button === Qt.RightButton) {
+                var point = mapToItem(root, mouse.x, mouse.y);
+                if (imageCard.imageData)
+                  root.showContextMenu(imageCard.imageData, point.x + 4, point.y + 4);
+                return;
+              }
+              if (imageCard.imageData)
+                root.selectedImage = imageCard.imageData;
+              root.previewOpen = true;
+            }
+          }
+        }
+
+        NText {
+          id: tagTextLabel
+          Layout.fillWidth: true
+          text: root.shortTags((imageCard.imageData && imageCard.imageData.tags) || "")
+          color: Color.mOnSurface
+          pointSize: Style.fontSizeXS
+          applyUiScale: false
+          wrapMode: Text.Wrap
+          maximumLineCount: 2
+          elide: Text.ElideRight
+        }
+
+        RowLayout {
+          Layout.fillWidth: true
+          spacing: Style.marginS
+
+          NText {
+            text: ((imageCard.imageData && imageCard.imageData.width) || 0) + "×" + ((imageCard.imageData && imageCard.imageData.height) || 0)
+            color: Color.mOnSurfaceVariant
+            pointSize: Style.fontSizeXS
+            applyUiScale: false
+          }
+
+          NText {
+            text: String((imageCard.imageData && imageCard.imageData.rating) || "s").toUpperCase()
+            color: Color.mOnSurfaceVariant
+            pointSize: Style.fontSizeXS
+            applyUiScale: false
+            Layout.fillWidth: true
+          }
+
+          NIcon {
+            visible: imageCard.imageQueued
+            icon: "loader-2"
+            color: Color.mPrimary
+            pointSize: Style.fontSizeXS
+            applyUiScale: false
+
+            RotationAnimation on rotation {
+              from: 0
+              to: 360
+              duration: 900
+              loops: Animation.Infinite
+              running: imageCard.imageQueued
+            }
+          }
+        }
+
+        RowLayout {
+          Layout.fillWidth: true
+          spacing: Style.marginXS
+
+          NIconButton {
+            icon: "download"
+            tooltipText: root.isImageSaved(imageCard.imageData) ? root.trText("booru.saved", "Saved") : root.trText("booru.save", "Save")
+            enabled: !imageCard.imageQueued && !root.isImageSaved(imageCard.imageData)
+            onClicked: root.beginSave(imageCard.imageData, false)
+          }
+
+          NIconButton {
+            icon: "image"
+            tooltipText: root.trText("booru.setWallpaper", "Set as wallpaper")
+            enabled: !imageCard.imageQueued
+            onClicked: root.beginSave(imageCard.imageData, true)
+          }
+
+          NIconButton {
+            icon: "external-link"
+            tooltipText: root.trText("booru.openBooruPage", "Open post")
+            onClicked: root.openBooruPage(imageCard.imageData)
+          }
+
+          Item {
+            Layout.fillWidth: true
+          }
+
+          NButton {
+            text: root.trText("booru.preview", "Preview")
+            onClicked: {
+              root.selectedImage = imageCard.imageData;
+              root.previewOpen = true;
+            }
+          }
+        }
+      }
+    }
+  }
+
   Component.onCompleted: {
     booruService.currentProvider = provider;
     restoreStateFromMain();
@@ -1850,7 +2063,7 @@ Item {
           width: scrollArea.availableWidth || scrollArea.width
           height: scrollArea.availableHeight || scrollArea.height
           contentWidth: width
-          contentHeight: imageFlow.implicitHeight
+          contentHeight: imageMasonry.layoutHeight
           clip: true
           boundsBehavior: Flickable.StopAtBounds
           onContentYChanged: {
@@ -1858,181 +2071,124 @@ Item {
             root.syncState();
           }
 
-          Flow {
-            id: imageFlow
+          Item {
+            id: imageMasonry
             width: Math.max(imageFlickable.width - Style.marginS, 1)
-            spacing: Style.marginS
+            height: layoutHeight
 
-            function cellWidth() {
+            property real spacing: Style.marginS
+            property real layoutHeight: 0
+            property bool relayoutPending: false
+            readonly property real columnWidth: {
               var columns = Math.max(1, root.imagesPerRow);
               var gaps = spacing * Math.max(0, columns - 1);
               return Math.max(120, Math.floor((width - gaps) / columns));
             }
 
+            function scheduleRelayout() {
+              if (relayoutPending)
+                return;
+              relayoutPending = true;
+              Qt.callLater(function() {
+                relayoutPending = false;
+                relayout();
+              });
+            }
+
+            function relayout() {
+              var columns = Math.max(1, root.imagesPerRow);
+              var columnHeights = [];
+              for (var c = 0; c < columns; ++c)
+                columnHeights.push(0);
+
+              var maxBottom = 0;
+              for (var i = 0; i < imageRepeater.count; ++i) {
+                var item = imageRepeater.itemAt(i);
+                if (!item)
+                  continue;
+
+                item.width = columnWidth;
+
+                var targetColumn = 0;
+                for (var j = 1; j < columns; ++j) {
+                  if (columnHeights[j] < columnHeights[targetColumn])
+                    targetColumn = j;
+                }
+
+                item.x = targetColumn * (columnWidth + spacing);
+                item.y = columnHeights[targetColumn];
+
+                var itemHeight = Math.max(item.implicitHeight || item.height || 0, 1);
+                columnHeights[targetColumn] += itemHeight + spacing;
+                if (columnHeights[targetColumn] > maxBottom)
+                  maxBottom = columnHeights[targetColumn];
+              }
+
+              layoutHeight = Math.max(0, maxBottom - (imageRepeater.count > 0 ? spacing : 0));
+            }
+
+            onWidthChanged: scheduleRelayout()
+            onColumnWidthChanged: scheduleRelayout()
+
+            Connections {
+              target: root
+
+              function onImagesPerRowChanged() {
+                imageMasonry.scheduleRelayout();
+              }
+
+              function onVariableCardSizeChanged() {
+                imageMasonry.scheduleRelayout();
+              }
+            }
+
             Repeater {
+              id: imageRepeater
               model: root.currentImages()
 
-              Rectangle {
-                width: imageFlow.cellWidth()
-                height: 268
-                radius: Style.radiusS
-                color: Color.mSurfaceVariant
-                border.color: Color.mOutline
-                border.width: 1
-                clip: true
+              onItemAdded: imageMasonry.scheduleRelayout()
+              onItemRemoved: imageMasonry.scheduleRelayout()
 
-                property bool imageQueued: root.isImageQueued(modelData)
+              delegate: Loader {
+                x: 0
+                y: 0
+                width: imageMasonry.columnWidth
+                height: item ? (item.implicitHeight || item.height || 1) : 1
+                sourceComponent: imageCardComponent
 
-                ColumnLayout {
-                  anchors.fill: parent
-                  anchors.margins: Style.marginS
-                  spacing: Style.marginS
-
-                  Rectangle {
-                    Layout.fillWidth: true
-                    Layout.preferredHeight: Math.max(110, parent.width * 0.62)
-                    radius: Style.radiusS
-                    color: Color.mSurface
-                    clip: true
-
-                    Image {
-                      id: thumbImage
-                      anchors.fill: parent
-                      anchors.margins: 1
-                      source: modelData.preview_url || modelData.sample_url || modelData.file_url
-                      asynchronous: true
-                      cache: true
-                      fillMode: Image.PreserveAspectCrop
-                      smooth: true
-                    }
-
-                    Rectangle {
-                      anchors.fill: parent
-                      color: Color.mSurface
-                      opacity: thumbImage.status === Image.Ready ? 0 : 0.92
-                      visible: thumbImage.status === Image.Loading || thumbImage.status === Image.Null || thumbImage.status === Image.Error
-
-                      ColumnLayout {
-                        anchors.centerIn: parent
-                        spacing: Style.marginS
-
-                        NIcon {
-                          Layout.alignment: Qt.AlignHCenter
-                          icon: thumbImage.status === Image.Error ? "image-off" : "loader-2"
-                          color: Color.mOnSurfaceVariant
-                          pointSize: Style.fontSizeL
-                          applyUiScale: false
-
-                          RotationAnimation on rotation {
-                            from: 0
-                            to: 360
-                            duration: 900
-                            loops: Animation.Infinite
-                            running: thumbImage.status === Image.Loading
-                          }
-                        }
-                      }
-                    }
-
-                    MouseArea {
-                      anchors.fill: parent
-                      acceptedButtons: Qt.LeftButton | Qt.RightButton
-                      cursorShape: Qt.PointingHandCursor
-                      onClicked: function (mouse) {
-                        if (mouse.button === Qt.RightButton) {
-                          var point = mapToItem(root, mouse.x, mouse.y);
-                          root.showContextMenu(modelData, point.x + 4, point.y + 4);
-                          return;
-                        }
-                        root.selectedImage = modelData;
-                        root.previewOpen = true;
-                      }
-                    }
+                Behavior on x {
+                  NumberAnimation {
+                    duration: 140
+                    easing.type: Easing.OutCubic
                   }
+                }
 
-                  NText {
-                    Layout.fillWidth: true
-                    text: root.shortTags(modelData.tags || "")
-                    color: Color.mOnSurface
-                    pointSize: Style.fontSizeXS
-                    applyUiScale: false
-                    wrapMode: Text.Wrap
-                    maximumLineCount: 2
-                    elide: Text.ElideRight
+                Behavior on y {
+                  NumberAnimation {
+                    duration: 140
+                    easing.type: Easing.OutCubic
                   }
+                }
 
-                  RowLayout {
-                    Layout.fillWidth: true
-                    spacing: Style.marginS
-
-                    NText {
-                      text: (modelData.width || 0) + "×" + (modelData.height || 0)
-                      color: Color.mOnSurfaceVariant
-                      pointSize: Style.fontSizeXS
-                      applyUiScale: false
-                    }
-
-                    NText {
-                      text: String(modelData.rating || "s").toUpperCase()
-                      color: Color.mOnSurfaceVariant
-                      pointSize: Style.fontSizeXS
-                      applyUiScale: false
-                      Layout.fillWidth: true
-                    }
-
-                    NIcon {
-                      visible: imageQueued
-                      icon: "loader-2"
-                      color: Color.mPrimary
-                      pointSize: Style.fontSizeXS
-                      applyUiScale: false
-
-                      RotationAnimation on rotation {
-                        from: 0
-                        to: 360
-                        duration: 900
-                        loops: Animation.Infinite
-                        running: imageQueued
-                      }
-                    }
+                Behavior on height {
+                  NumberAnimation {
+                    duration: 120
+                    easing.type: Easing.OutCubic
                   }
+                }
 
-                  RowLayout {
-                    Layout.fillWidth: true
-                    spacing: Style.marginXS
+                onLoaded: {
+                  if (!item)
+                    return;
+                  item.imageData = modelData;
+                  item.width = width;
+                  imageMasonry.scheduleRelayout();
+                }
 
-                    NIconButton {
-                      icon: "download"
-                      tooltipText: root.isImageSaved(modelData) ? root.trText("booru.saved", "Saved") : root.trText("booru.save", "Save")
-                      enabled: !imageQueued && !root.isImageSaved(modelData)
-                      onClicked: root.beginSave(modelData, false)
-                    }
-
-                    NIconButton {
-                      icon: "image"
-                      tooltipText: root.trText("booru.setWallpaper", "Set as wallpaper")
-                      enabled: !imageQueued
-                      onClicked: root.beginSave(modelData, true)
-                    }
-
-                    NIconButton {
-                      icon: "external-link"
-                      tooltipText: root.trText("booru.openBooruPage", "Open post")
-                      onClicked: root.openBooruPage(modelData)
-                    }
-
-                    Item {
-                      Layout.fillWidth: true
-                    }
-
-                    NButton {
-                      text: root.trText("booru.preview", "Preview")
-                      onClicked: {
-                        root.selectedImage = modelData;
-                        root.previewOpen = true;
-                      }
-                    }
-                  }
+                onWidthChanged: {
+                  if (item)
+                    item.width = width;
+                  imageMasonry.scheduleRelayout();
                 }
               }
             }

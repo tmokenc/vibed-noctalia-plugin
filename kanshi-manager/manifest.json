@@ -1,7 +1,7 @@
 {
   "id": "kanshi-manager",
   "name": "Kanshi Manager",
-  "version": "0.1.0",
+  "version": "0.3.9",
   "minNoctaliaVersion": "4.6.0",
   "author": "OpenAI",
   "license": "MIT",

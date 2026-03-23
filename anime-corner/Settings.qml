@@ -23,6 +23,7 @@ ColumnLayout {
   property string editBooruSaveDirectory: pluginApi?.pluginSettings?.booru?.saveDirectory || pluginApi?.manifest?.metadata?.defaultSettings?.booru?.saveDirectory || ""
   property string editBooruWallpaperCommand: pluginApi?.pluginSettings?.booru?.wallpaperCommand || pluginApi?.manifest?.metadata?.defaultSettings?.booru?.wallpaperCommand || ""
   property int editBooruImagesPerRow: pluginApi?.pluginSettings?.booru?.imagesPerRow ?? pluginApi?.manifest?.metadata?.defaultSettings?.booru?.imagesPerRow ?? 2
+  property bool editBooruVariableCardSize: pluginApi?.pluginSettings?.booru?.variableCardSize ?? pluginApi?.manifest?.metadata?.defaultSettings?.booru?.variableCardSize ?? true
   property int editBooruRecentSearchTagLimit: pluginApi?.pluginSettings?.booru?.recentSearchTagLimit ?? pluginApi?.manifest?.metadata?.defaultSettings?.booru?.recentSearchTagLimit ?? 20
   property int editDanbooruTagIndexRefreshDays: pluginApi?.pluginSettings?.booru?.danbooruTagIndexRefreshDays ?? pluginApi?.manifest?.metadata?.defaultSettings?.booru?.danbooruTagIndexRefreshDays ?? 7
 
@@ -165,6 +166,15 @@ ColumnLayout {
     defaultValue: false
   }
 
+  NToggle {
+    Layout.fillWidth: true
+    label: "Variable card size"
+    description: "Use image ratio-aware masonry cards instead of fixed-size cards"
+    checked: root.editBooruVariableCardSize
+    onToggled: function(checked) { root.editBooruVariableCardSize = checked; }
+    defaultValue: true
+  }
+
   ColumnLayout {
     Layout.fillWidth: true
     spacing: Style.marginS
@@ -248,6 +258,7 @@ ColumnLayout {
     pluginApi.pluginSettings.booru.saveDirectory = root.editBooruSaveDirectory;
     pluginApi.pluginSettings.booru.wallpaperCommand = root.editBooruWallpaperCommand;
     pluginApi.pluginSettings.booru.imagesPerRow = root.editBooruImagesPerRow;
+    pluginApi.pluginSettings.booru.variableCardSize = root.editBooruVariableCardSize;
     pluginApi.pluginSettings.booru.recentSearchTagLimit = root.editBooruRecentSearchTagLimit;
     pluginApi.pluginSettings.booru.danbooruTagIndexRefreshDays = root.editDanbooruTagIndexRefreshDays;
 

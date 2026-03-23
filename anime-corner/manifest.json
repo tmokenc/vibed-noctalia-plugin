@@ -1,7 +1,7 @@
 {
   "id": "anime-corner",
   "name": "Anime Corner",
-  "version": "0.1.0",
+  "version": "0.6.0",
   "minNoctaliaVersion": "4.1.2",
   "author": "OpenAI",
   "license": "MIT",
@@ -40,7 +40,8 @@
         "wallpaperCommand": "qs -c noctalia-shell ipc call wallpaper set {file} \"\"",
         "imagesPerRow": 2,
         "recentSearchTagLimit": 20,
-        "danbooruTagIndexRefreshDays": 7
+        "danbooruTagIndexRefreshDays": 7,
+        "variableCardSize": true
       }
     }
   }

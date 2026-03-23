@@ -3,7 +3,7 @@
   "name": "Anime Corner",
   "version": "0.1.0",
   "minNoctaliaVersion": "4.1.2",
-  "author": "OpenGPI",
+  "author": "OpenAI",
   "license": "MIT",
   "repository": "https://github.com/tmokenc/vibed-noctalia-plugin",
   "description": "Anime art and wallpaper browser for booru image boards",

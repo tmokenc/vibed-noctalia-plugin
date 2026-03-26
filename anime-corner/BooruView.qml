@@ -2458,7 +2458,7 @@ Item {
       id: tagSuggestionPopup
       visible: parent.visible
       x: searchInput ? searchInput.mapToItem(tagSuggestionOverlay, 0, 0).x : 0
-      y: searchInput ? (searchInput.mapToItem(tagSuggestionOverlay, 0, searchInput.height).y + Style.marginXS) : 0
+      y: searchInput ? (searchInput.mapToItem(tagSuggestionOverlay, 0, searchInput.height).y + Style.marginXS) + 100 : 0
       width: searchFieldFrame ? searchFieldFrame.width : 0
       height: visible ? Math.min(tagSuggestionList.contentHeight, 260) : 0
       radius: Style.radiusS

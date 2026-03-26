@@ -12,6 +12,8 @@ Item {
   readonly property string cacheDir: typeof Settings !== "undefined" && Settings.cacheDir ? Settings.cacheDir + "plugins/anime-corner/" : ""
   readonly property string stateCachePath: cacheDir + "state.json"
 
+  property int activeTab: 0
+
   property var booruState: ({
       "provider": pluginApi?.pluginSettings?.booru?.provider || pluginApi?.manifest?.metadata?.defaultSettings?.booru?.provider || "yandere",
       "safeOnly": pluginApi?.pluginSettings?.booru?.safeOnly ?? pluginApi?.manifest?.metadata?.defaultSettings?.booru?.safeOnly ?? true,
@@ -21,6 +23,23 @@ Item {
       "lastQueryRandomOrder": false,
       "scrollContentY": 0,
       "response": null
+    })
+
+  property var animeThemesState: ({
+      "searchText": "",
+      "lastSubmittedSearchText": "",
+      "results": [],
+      "selectedAnimeId": "",
+      "recentSearches": [],
+      "filters": {
+        "themeType": "all",
+        "season": "any",
+        "year": "",
+        "mediaType": "any"
+      },
+      "statusMessage": "Search AnimeThemes for OP/ED videos",
+      "playerStatusMessage": "",
+      "lastPlayedThemeId": ""
     })
 
   signal stateCacheReady
@@ -59,8 +78,14 @@ Item {
 
     try {
       var parsed = JSON.parse(content);
-      if (parsed && typeof parsed === "object" && parsed.booruState)
-        root.booruState = parsed.booruState;
+      if (parsed && typeof parsed === "object") {
+        if (parsed.booruState)
+          root.booruState = parsed.booruState;
+        if (parsed.animeThemesState)
+          root.animeThemesState = parsed.animeThemesState;
+        if (parsed.activeTab !== undefined)
+          root.activeTab = parseInt(parsed.activeTab, 10) || 0;
+      }
     } catch (e) {
       Logger.e("AnimeCorner", "Failed to parse state cache: " + e);
     }
@@ -87,7 +112,9 @@ Item {
     try {
       ensureCacheDir();
       stateCacheFile.setText(JSON.stringify({
-        "booruState": root.booruState
+        "activeTab": root.activeTab,
+        "booruState": root.booruState,
+        "animeThemesState": root.animeThemesState
       }));
     } catch (e) {
       Logger.e("AnimeCorner", "Failed to save state cache: " + e);

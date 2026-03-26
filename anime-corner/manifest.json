@@ -1,12 +1,12 @@
 {
   "id": "anime-corner",
   "name": "Anime Corner",
-  "version": "0.6.0",
+  "version": "0.2.11",
   "minNoctaliaVersion": "4.1.2",
   "author": "OpenAI",
   "license": "MIT",
   "repository": "https://github.com/tmokenc/vibed-noctalia-plugin",
-  "description": "Anime art and wallpaper browser for booru image boards",
+  "description": "Anime art, wallpapers, and OP/ED theme browser for Noctalia",
   "tags": [
     "Bar",
     "Panel",
@@ -26,9 +26,9 @@
   "metadata": {
     "defaultSettings": {
       "panelDetached": true,
-      "panelPosition": "right",
+      "panelPosition": "left",
       "panelHeightRatio": 0.85,
-      "panelWidth": 520,
+      "panelWidth": 920,
       "attachmentStyle": "connected",
       "scale": 1,
       "booru": {
@@ -38,10 +38,15 @@
         "randomOrder": false,
         "saveDirectory": "",
         "wallpaperCommand": "qs -c noctalia-shell ipc call wallpaper set {file} \"\"",
-        "imagesPerRow": 2,
+        "imagesPerRow": 3,
         "recentSearchTagLimit": 20,
         "danbooruTagIndexRefreshDays": 7,
         "variableCardSize": true
+      },
+      "animethemes": {
+        "pageSize": 12,
+        "recentSearchLimit": 20,
+        "mpvCommand": "mpv"
       }
     }
   }

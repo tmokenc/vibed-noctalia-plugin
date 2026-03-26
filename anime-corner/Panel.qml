@@ -10,37 +10,48 @@ Item {
   id: root
 
   property var pluginApi: null
+
   readonly property var mainInstance: pluginApi?.mainInstance
-
-  readonly property string panelPosition: pluginApi?.pluginSettings?.panelPosition || pluginApi?.manifest?.metadata?.defaultSettings?.panelPosition || "right"
-  readonly property bool detached: pluginApi?.pluginSettings?.panelDetached ?? pluginApi?.manifest?.metadata?.defaultSettings?.panelDetached ?? true
-  readonly property string attachmentStyle: pluginApi?.pluginSettings?.attachmentStyle || pluginApi?.manifest?.metadata?.defaultSettings?.attachmentStyle || "connected"
-  readonly property bool floatingAttached: !detached && attachmentStyle === "floating"
-
-  readonly property bool allowAttach: !detached
-  readonly property bool panelAnchorRight: panelPosition === "right"
-  readonly property bool panelAnchorLeft: panelPosition === "left"
-  readonly property bool panelAnchorHorizontalCenter: (detached && panelPosition === "center") || (floatingAttached && (panelPosition === "top" || panelPosition === "bottom"))
-  readonly property bool panelAnchorVerticalCenter: detached || (floatingAttached && (panelPosition === "left" || panelPosition === "right"))
-  readonly property bool panelAnchorTop: !detached && panelPosition === "top"
-  readonly property bool panelAnchorBottom: !detached && panelPosition === "bottom"
-
-  property int panelWidth: pluginApi?.pluginSettings?.panelWidth ?? pluginApi?.manifest?.metadata?.defaultSettings?.panelWidth ?? 520
-  property real panelHeightRatio: pluginApi?.pluginSettings?.panelHeightRatio ?? pluginApi?.manifest?.metadata?.defaultSettings?.panelHeightRatio ?? 0.85
-  property real contentPreferredWidth: panelWidth + ((booruViewRef && booruViewRef.attachedPreviewVisible) ? booruViewRef.attachedPreviewExtraWidth : 0)
-  property real contentPreferredHeight: screen ? (screen.height * panelHeightRatio) : 620 * Style.uiScaleRatio
-  property real uiScale: pluginApi?.pluginSettings?.scale ?? pluginApi?.manifest?.metadata?.defaultSettings?.scale ?? 1
-
   readonly property var geometryPlaceholder: panelContainer
+  readonly property string _panelPosition: pluginApi?.pluginSettings?.panelPosition || pluginApi?.manifest?.metadata?.defaultSettings?.panelPosition || "left"
+  readonly property bool _detached: pluginApi?.pluginSettings?.panelDetached ?? pluginApi?.manifest?.metadata?.defaultSettings?.panelDetached ?? true
+  readonly property string _attachmentStyle: pluginApi?.pluginSettings?.attachmentStyle || pluginApi?.manifest?.metadata?.defaultSettings?.attachmentStyle || "connected"
+  readonly property bool _isFloatingAttached: !_detached && _attachmentStyle === "floating"
+  readonly property bool allowAttach: !_detached
+  readonly property bool panelAnchorRight: !_detached ? _panelPosition === "right" : (_panelPosition === "right")
+  readonly property bool panelAnchorLeft: !_detached ? _panelPosition === "left" : (_panelPosition === "left")
+  readonly property bool panelAnchorHorizontalCenter: (_detached && _panelPosition === "center") || (_isFloatingAttached && (_panelPosition === "top" || _panelPosition === "bottom"))
+  readonly property bool panelAnchorVerticalCenter: _detached || (_isFloatingAttached && (_panelPosition === "left" || _panelPosition === "right"))
+  readonly property bool panelAnchorTop: !_detached && _panelPosition === "top"
+  readonly property bool panelAnchorBottom: !_detached && _panelPosition === "bottom"
+
+  property int currentTab: mainInstance?.activeTab ?? 0
+  property int panelWidth: pluginApi?.pluginSettings?.panelWidth ?? pluginApi?.manifest?.metadata?.defaultSettings?.panelWidth ?? 920
+  property real panelHeightRatio: pluginApi?.pluginSettings?.panelHeightRatio ?? pluginApi?.manifest?.metadata?.defaultSettings?.panelHeightRatio ?? 0.85
+  property real uiScale: pluginApi?.pluginSettings?.scale ?? pluginApi?.manifest?.metadata?.defaultSettings?.scale ?? 1
+  property real contentPreferredWidth: panelWidth + ((currentTab === 0 && booruViewRef && booruViewRef.attachedPreviewVisible) ? booruViewRef.attachedPreviewExtraWidth : 0)
+  property real contentPreferredHeight: screen ? (screen.height * panelHeightRatio) : 720 * Style.uiScaleRatio
 
   anchors.fill: parent
+
+  onCurrentTabChanged: {
+    if (tabBar && tabBar.currentIndex !== currentTab)
+      tabBar.currentIndex = currentTab;
+    if (mainInstance) {
+      mainInstance.activeTab = currentTab;
+      if (mainInstance.saveState)
+        mainInstance.saveState();
+    }
+  }
 
   onVisibleChanged: {
     if (!visible)
       return;
     Qt.callLater(function() {
-      if (booruViewRef && booruViewRef.focusInput)
+      if (currentTab === 0 && booruViewRef && booruViewRef.focusInput)
         booruViewRef.focusInput();
+      else if (currentTab === 1 && animeThemesViewRef && animeThemesViewRef.focusInput)
+        animeThemesViewRef.focusInput();
     });
   }
 
@@ -51,9 +62,9 @@ Item {
     width: root.contentPreferredWidth
     height: root.contentPreferredHeight
     color: "transparent"
-    anchors.horizontalCenter: (root.detached && root.panelPosition === "center" && parent) ? parent.horizontalCenter : undefined
-    anchors.verticalCenter: (root.detached && root.panelPosition === "center" && parent) ? parent.verticalCenter : undefined
-    y: (root.detached && (root.panelPosition === "left" || root.panelPosition === "right")) ? (root.height - root.contentPreferredHeight) / 2 : 0
+    anchors.horizontalCenter: (_detached && _panelPosition === "center" && parent) ? parent.horizontalCenter : undefined
+    anchors.verticalCenter: (_detached && _panelPosition === "center" && parent) ? parent.verticalCenter : undefined
+    y: (_detached && (_panelPosition === "left" || _panelPosition === "right")) ? (root.height - root.contentPreferredHeight) / 2 : 0
 
     Rectangle {
       anchors.fill: parent
@@ -106,7 +117,7 @@ Item {
               Item { Layout.fillWidth: true }
 
               NText {
-                text: "Art boards"
+                text: currentTab === 0 ? "Art boards" : "OP/ED themes"
                 color: Color.mOnSurfaceVariant
                 pointSize: Style.fontSizeS
               }
@@ -115,15 +126,37 @@ Item {
         }
       }
 
-      Item {
+      TabBar {
+        id: tabBar
+        Layout.fillWidth: true
+        currentIndex: root.currentTab
+        onCurrentIndexChanged: root.currentTab = currentIndex
+
+        TabButton { text: "Boards" }
+        TabButton { text: "Themes" }
+      }
+
+      StackLayout {
         Layout.fillWidth: true
         Layout.fillHeight: true
+        currentIndex: root.currentTab
 
-        BooruView {
-          id: booruViewRef
-          anchors.fill: parent
-          pluginApi: root.pluginApi
-          mainInstance: root.mainInstance
+        Item {
+          BooruView {
+            id: booruViewRef
+            anchors.fill: parent
+            pluginApi: root.pluginApi
+            mainInstance: root.mainInstance
+          }
+        }
+
+        Item {
+          AnimeThemesView {
+            id: animeThemesViewRef
+            anchors.fill: parent
+            pluginApi: root.pluginApi
+            mainInstance: root.mainInstance
+          }
         }
       }
     }

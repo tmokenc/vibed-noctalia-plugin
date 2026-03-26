@@ -10,9 +10,9 @@ ColumnLayout {
   property var pluginApi: null
 
   property bool editPanelDetached: pluginApi?.pluginSettings?.panelDetached ?? pluginApi?.manifest?.metadata?.defaultSettings?.panelDetached ?? true
-  property string editPanelPosition: pluginApi?.pluginSettings?.panelPosition || pluginApi?.manifest?.metadata?.defaultSettings?.panelPosition || "right"
+  property string editPanelPosition: pluginApi?.pluginSettings?.panelPosition || pluginApi?.manifest?.metadata?.defaultSettings?.panelPosition || "left"
   property real editPanelHeightRatio: pluginApi?.pluginSettings?.panelHeightRatio ?? pluginApi?.manifest?.metadata?.defaultSettings?.panelHeightRatio ?? 0.85
-  property int editPanelWidth: pluginApi?.pluginSettings?.panelWidth ?? pluginApi?.manifest?.metadata?.defaultSettings?.panelWidth ?? 520
+  property int editPanelWidth: pluginApi?.pluginSettings?.panelWidth ?? pluginApi?.manifest?.metadata?.defaultSettings?.panelWidth ?? 920
   property string editAttachmentStyle: pluginApi?.pluginSettings?.attachmentStyle || pluginApi?.manifest?.metadata?.defaultSettings?.attachmentStyle || "connected"
   property real editScale: pluginApi?.pluginSettings?.scale ?? pluginApi?.manifest?.metadata?.defaultSettings?.scale ?? 1
 
@@ -22,10 +22,13 @@ ColumnLayout {
   property bool editBooruRandomOrder: pluginApi?.pluginSettings?.booru?.randomOrder ?? pluginApi?.manifest?.metadata?.defaultSettings?.booru?.randomOrder ?? false
   property string editBooruSaveDirectory: pluginApi?.pluginSettings?.booru?.saveDirectory || pluginApi?.manifest?.metadata?.defaultSettings?.booru?.saveDirectory || ""
   property string editBooruWallpaperCommand: pluginApi?.pluginSettings?.booru?.wallpaperCommand || pluginApi?.manifest?.metadata?.defaultSettings?.booru?.wallpaperCommand || ""
-  property int editBooruImagesPerRow: pluginApi?.pluginSettings?.booru?.imagesPerRow ?? pluginApi?.manifest?.metadata?.defaultSettings?.booru?.imagesPerRow ?? 2
+  property int editBooruImagesPerRow: pluginApi?.pluginSettings?.booru?.imagesPerRow ?? pluginApi?.manifest?.metadata?.defaultSettings?.booru?.imagesPerRow ?? 3
   property bool editBooruVariableCardSize: pluginApi?.pluginSettings?.booru?.variableCardSize ?? pluginApi?.manifest?.metadata?.defaultSettings?.booru?.variableCardSize ?? true
   property int editBooruRecentSearchTagLimit: pluginApi?.pluginSettings?.booru?.recentSearchTagLimit ?? pluginApi?.manifest?.metadata?.defaultSettings?.booru?.recentSearchTagLimit ?? 20
   property int editDanbooruTagIndexRefreshDays: pluginApi?.pluginSettings?.booru?.danbooruTagIndexRefreshDays ?? pluginApi?.manifest?.metadata?.defaultSettings?.booru?.danbooruTagIndexRefreshDays ?? 7
+  property int editAnimeThemesPageSize: pluginApi?.pluginSettings?.animethemes?.pageSize ?? pluginApi?.manifest?.metadata?.defaultSettings?.animethemes?.pageSize ?? 12
+  property int editAnimeThemesRecentSearchLimit: pluginApi?.pluginSettings?.animethemes?.recentSearchLimit ?? pluginApi?.manifest?.metadata?.defaultSettings?.animethemes?.recentSearchLimit ?? 20
+  property string editAnimeThemesMpvCommand: pluginApi?.pluginSettings?.animethemes?.mpvCommand || pluginApi?.manifest?.metadata?.defaultSettings?.animethemes?.mpvCommand || "mpv"
 
   spacing: Style.marginM
 
@@ -69,7 +72,7 @@ ColumnLayout {
     ]
     currentKey: root.editPanelPosition
     onSelected: function(key) { root.editPanelPosition = key; }
-    defaultValue: "right"
+    defaultValue: "left"
   }
 
   NComboBox {
@@ -238,11 +241,60 @@ ColumnLayout {
     onTextChanged: root.editBooruWallpaperCommand = text
   }
 
+  NDivider {
+    Layout.fillWidth: true
+    Layout.topMargin: Style.marginM
+    Layout.bottomMargin: Style.marginM
+  }
+
+  NText {
+    text: "AnimeThemes"
+    pointSize: Style.fontSizeM
+    font.weight: Font.Bold
+    color: Color.mOnSurface
+  }
+
+  ColumnLayout {
+    Layout.fillWidth: true
+    spacing: Style.marginS
+
+    NLabel { label: "Results per search: " + root.editAnimeThemesPageSize }
+    NSlider {
+      Layout.fillWidth: true
+      from: 5
+      to: 30
+      stepSize: 1
+      value: root.editAnimeThemesPageSize
+      onValueChanged: root.editAnimeThemesPageSize = value
+    }
+
+    NLabel { label: "Recent searches shown: " + root.editAnimeThemesRecentSearchLimit }
+    NSlider {
+      Layout.fillWidth: true
+      from: 0
+      to: 50
+      stepSize: 1
+      value: root.editAnimeThemesRecentSearchLimit
+      onValueChanged: root.editAnimeThemesRecentSearchLimit = value
+    }
+  }
+
+  NTextInput {
+    Layout.fillWidth: true
+    label: "MPV command"
+    description: "Command used for AnimeThemes playback"
+    text: root.editAnimeThemesMpvCommand
+    placeholderText: "mpv"
+    onTextChanged: root.editAnimeThemesMpvCommand = text
+  }
+
   function saveSettings() {
     if (!pluginApi)
       return;
     if (!pluginApi.pluginSettings.booru)
       pluginApi.pluginSettings.booru = {};
+    if (!pluginApi.pluginSettings.animethemes)
+      pluginApi.pluginSettings.animethemes = {};
 
     pluginApi.pluginSettings.panelDetached = root.editPanelDetached;
     pluginApi.pluginSettings.panelPosition = root.editPanelPosition;
@@ -261,6 +313,10 @@ ColumnLayout {
     pluginApi.pluginSettings.booru.variableCardSize = root.editBooruVariableCardSize;
     pluginApi.pluginSettings.booru.recentSearchTagLimit = root.editBooruRecentSearchTagLimit;
     pluginApi.pluginSettings.booru.danbooruTagIndexRefreshDays = root.editDanbooruTagIndexRefreshDays;
+
+    pluginApi.pluginSettings.animethemes.pageSize = root.editAnimeThemesPageSize;
+    pluginApi.pluginSettings.animethemes.recentSearchLimit = root.editAnimeThemesRecentSearchLimit;
+    pluginApi.pluginSettings.animethemes.mpvCommand = root.editAnimeThemesMpvCommand;
 
     pluginApi.saveSettings();
     Logger.i("AnimeCorner", "Settings saved successfully");

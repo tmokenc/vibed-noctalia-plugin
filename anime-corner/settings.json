@@ -2,7 +2,7 @@
   "panelDetached": true,
   "panelPosition": "left",
   "panelHeightRatio": 0.85,
-  "panelWidth": 520,
+  "panelWidth": 920,
   "attachmentStyle": "connected",
   "scale": 1,
   "booru": {
@@ -12,9 +12,14 @@
     "pageSize": 20,
     "saveDirectory": "",
     "wallpaperCommand": "qs -c noctalia-shell ipc call wallpaper set {file} \"\"",
-    "imagesPerRow": 2,
+    "imagesPerRow": 3,
     "recentSearchTagLimit": 20,
     "danbooruTagIndexRefreshDays": 7,
     "variableCardSize": true
+  },
+  "animethemes": {
+    "pageSize": 12,
+    "recentSearchLimit": 20,
+    "mpvCommand": "mpv"
   }
 }

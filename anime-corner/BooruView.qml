@@ -22,7 +22,7 @@ Item {
   property bool safeOnly: pluginApi?.pluginSettings?.booru?.safeOnly ?? pluginApi?.manifest?.metadata?.defaultSettings?.booru?.safeOnly ?? true
   property bool randomOrder: pluginApi?.pluginSettings?.booru?.randomOrder ?? pluginApi?.manifest?.metadata?.defaultSettings?.booru?.randomOrder ?? false
   property int pageSize: pluginApi?.pluginSettings?.booru?.pageSize || pluginApi?.manifest?.metadata?.defaultSettings?.booru?.pageSize || 20
-  property int imagesPerRow: pluginApi?.pluginSettings?.booru?.imagesPerRow || pluginApi?.manifest?.metadata?.defaultSettings?.booru?.imagesPerRow || 2
+  property int imagesPerRow: pluginApi?.pluginSettings?.booru?.imagesPerRow || pluginApi?.manifest?.metadata?.defaultSettings?.booru?.imagesPerRow || 3
   property bool variableCardSize: pluginApi?.pluginSettings?.booru?.variableCardSize ?? pluginApi?.manifest?.metadata?.defaultSettings?.booru?.variableCardSize ?? true
   property int recentSearchTagLimit: pluginApi?.pluginSettings?.booru?.recentSearchTagLimit ?? pluginApi?.manifest?.metadata?.defaultSettings?.booru?.recentSearchTagLimit ?? 20
   property int danbooruTagIndexRefreshDays: pluginApi?.pluginSettings?.booru?.danbooruTagIndexRefreshDays ?? pluginApi?.manifest?.metadata?.defaultSettings?.booru?.danbooruTagIndexRefreshDays ?? 7
@@ -2458,7 +2458,7 @@ Item {
       id: tagSuggestionPopup
       visible: parent.visible
       x: searchInput ? searchInput.mapToItem(tagSuggestionOverlay, 0, 0).x : 0
-      y: searchInput ? (searchInput.mapToItem(tagSuggestionOverlay, 0, searchInput.height).y + Style.marginXS) + 100 : 0
+      y: searchInput ? (searchInput.mapToItem(tagSuggestionOverlay, 0, searchInput.height).y + Style.marginXS) : 0
       width: searchFieldFrame ? searchFieldFrame.width : 0
       height: visible ? Math.min(tagSuggestionList.contentHeight, 260) : 0
       radius: Style.radiusS

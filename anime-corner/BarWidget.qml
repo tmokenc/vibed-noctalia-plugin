@@ -46,7 +46,7 @@ Item {
     cursorShape: Qt.PointingHandCursor
     acceptedButtons: Qt.LeftButton | Qt.RightButton
 
-    onEntered: TooltipService.show(root, "Anime Corner\nAnime art & wallpapers", BarService.getTooltipDirection())
+    onEntered: TooltipService.show(root, "Anime Corner\nAnime art, wallpapers & themes", BarService.getTooltipDirection())
     onExited: TooltipService.hide()
 
     onClicked: function(mouse) {

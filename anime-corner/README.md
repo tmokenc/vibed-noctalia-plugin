@@ -24,3 +24,6 @@ qs -c noctalia-shell ipc call plugin:anime-corner toggle
 qs -c noctalia-shell ipc call plugin:anime-corner open
 qs -c noctalia-shell ipc call plugin:anime-corner close
 ```
+
+
+Features now include both booru browsing and AnimeThemes OP/ED browsing with MPV playback handoff.

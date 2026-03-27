@@ -10,99 +10,89 @@ Item {
 
   signal searchFinished(var payload)
   signal searchFailed(string message)
+  signal detailFinished(var payload)
+  signal detailFailed(string animeId, string message)
 
   property string defaultUserAgent: "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36"
   property string apiBaseUrl: "https://api.animethemes.moe"
-  property string requestStdout: ""
-  property string requestStderr: ""
-  property var activeRequest: null
-  property var pendingRequest: null
+
+  property string searchStdout: ""
+  property string searchStderr: ""
+  property var activeSearchRequest: null
+  property var pendingSearchRequest: null
+
+  property string detailStdout: ""
+  property string detailStderr: ""
+  property var activeDetailRequest: null
+  property var pendingDetailRequest: null
+
+  property var searchCache: ({})
+  property var detailCache: ({})
+
+  function searchCacheKey(query, pageSize) {
+    return String(query || "").trim().toLowerCase() + "::" + String(pageSize || 12);
+  }
+
+  function detailCacheKey(anilistId) {
+    return String(anilistId || "");
+  }
 
   function buildSearchCommand(query, pageSize) {
     var code = [
-      "import concurrent.futures, json, sys, urllib.parse, urllib.request",
+      "import json, sys, urllib.request",
       "query = sys.argv[1]",
       "page_size = max(1, int(sys.argv[2]))",
       "user_agent = sys.argv[3]",
-      "api_base = sys.argv[4].rstrip('/')",
       "ani_base = 'https://graphql.anilist.co'",
-      "include = 'images,resources,animethemes.song.artists,animethemes.animethemeentries.videos,animethemes.group'",
-      "headers = {'User-Agent': user_agent, 'Accept': 'application/json'}",
-      "def request_json(url, data=None, extra_headers=None):",
-      "    req_headers = dict(headers)",
-      "    if extra_headers:",
-      "        req_headers.update(extra_headers)",
-      "    request = urllib.request.Request(url, data=data, headers=req_headers)",
-      "    with urllib.request.urlopen(request, timeout=30) as response:",
-      "        return json.loads(response.read().decode('utf-8'))",
-      "graphql = json.dumps({",
-      "    'query': 'query ($search: String, $page: Int, $perPage: Int) { Page(page: $page, perPage: $perPage) { media(search: $search, type: ANIME, sort: SEARCH_MATCH) { id title { romaji english native } season seasonYear format description(asHtml: false) coverImage { large medium } } } }',",
-      "    'variables': {'search': query, 'page': 1, 'perPage': page_size}",
+      "headers = {'User-Agent': user_agent, 'Accept': 'application/json', 'Content-Type': 'application/json'}",
+      "payload = json.dumps({",
+      "  'query': 'query ($search: String, $page: Int, $perPage: Int) { Page(page: $page, perPage: $perPage) { media(search: $search, type: ANIME, sort: SEARCH_MATCH) { id siteUrl title { romaji english native } synonyms season seasonYear format status description(asHtml: false) episodes duration averageScore meanScore popularity favourites genres countryOfOrigin hashtag bannerImage coverImage { large medium } startDate { year month day } endDate { year month day } studios(isMain: true) { nodes { name } } } } }',",
+      "  'variables': {'search': query, 'page': 1, 'perPage': page_size}",
       "}).encode('utf-8')",
-      "search_payload = request_json(ani_base, graphql, {'Content-Type': 'application/json', 'Accept': 'application/json'})",
-      "media_items = (((search_payload or {}).get('data') or {}).get('Page') or {}).get('media') or []",
-      "def fetch_media(media):",
-      "    media_id = media.get('id')",
-      "    if not media_id:",
-      "        return None",
-      "    params = [",
-      "        ('filter[has]', 'resources'),",
-      "        ('filter[site]', 'AniList'),",
-      "        ('filter[external_id]', str(media_id)),",
-      "        ('include', include),",
-      "    ]",
-      "    url = api_base + '/anime?' + urllib.parse.urlencode(params)",
-      "    payload = request_json(url)",
-      "    anime_list = payload.get('anime') if isinstance(payload, dict) else None",
-      "    if not isinstance(anime_list, list):",
-      "        anime_list = payload.get('data') if isinstance(payload, dict) else None",
-      "    if not anime_list:",
-      "        return None",
-      "    item = anime_list[0]",
-      "    if not isinstance(item, dict):",
-      "        return None",
-      "    if not item.get('name'):",
-      "        title = media.get('title') or {}",
-      "        item['name'] = title.get('english') or title.get('romaji') or title.get('native') or ''",
-      "    if not item.get('year') and media.get('seasonYear'):",
-      "        item['year'] = media.get('seasonYear')",
-      "    if not item.get('season') and media.get('season'):",
-      "        item['season'] = str(media.get('season')).title()",
-      "    if not item.get('media_format') and media.get('format'):",
-      "        item['media_format'] = str(media.get('format')).replace('_', ' ').title()",
-      "    if not item.get('synopsis') and media.get('description'):",
-      "        item['synopsis'] = media.get('description')",
-      "    cover = None",
-      "    if isinstance(media.get('coverImage'), dict):",
-      "        cover = media['coverImage'].get('large') or media['coverImage'].get('medium')",
-      "    if cover:",
-      "        item['_fallback_cover'] = cover",
-      "    if (not item.get('images')) and cover:",
-      "        item['images'] = [{'link': cover}]",
-      "    return item",
-      "results = []",
-      "with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:",
-      "    futures = [executor.submit(fetch_media, media) for media in media_items]",
-      "    for future in concurrent.futures.as_completed(futures):",
-      "        item = future.result()",
-      "        if item is not None:",
-      "            results.append(item)",
-      "# preserve AniList search order",
-      "order = {}",
-      "for index, media in enumerate(media_items):",
-      "    media_id = str(media.get('id') or '')",
-      "    if media_id:",
-      "        order[media_id] = index",
-      "def result_index(item):",
-      "    resources = item.get('resources') or []",
-      "    for resource in resources:",
-      "        if str(resource.get('site') or '').lower() == 'anilist':",
-      "            return order.get(str(resource.get('external_id') or ''), 10**9)",
-      "    return 10**9",
-      "results.sort(key=result_index)",
-      "print(json.dumps({'anime': results}))"
+      "request = urllib.request.Request(ani_base, data=payload, headers=headers)",
+      "with urllib.request.urlopen(request, timeout=30) as response:",
+      "    data = json.loads(response.read().decode('utf-8'))",
+      "media = (((data or {}).get('data') or {}).get('Page') or {}).get('media') or []",
+      "print(json.dumps({'results': media}))"
     ].join('\n');
-    return ['python3', '-c', code, String(query || '').trim(), String(Math.max(1, parseInt(pageSize || 12, 10) || 12)), defaultUserAgent, apiBaseUrl];
+
+    return ['python3', '-c', code, String(query || '').trim(), String(Math.max(1, parseInt(pageSize || 12, 10) || 12)), defaultUserAgent];
+  }
+
+  function buildDetailCommand(anilistId) {
+    var code = [
+      "import json, sys, urllib.parse, urllib.request",
+      "anilist_id = sys.argv[1]",
+      "user_agent = sys.argv[2]",
+      "api_base = sys.argv[3].rstrip('/')",
+      "include = 'images,resources,animethemes.song.artists,animethemes.animethemeentries.videos,animethemes.group'",
+      "params = [",
+      "  ('filter[has]', 'resources'),",
+      "  ('filter[site]', 'AniList'),",
+      "  ('filter[external_id]', str(anilist_id)),",
+      "  ('include', include),",
+      "]",
+      "url = api_base + '/anime?' + urllib.parse.urlencode(params)",
+      "headers = {'User-Agent': user_agent, 'Accept': 'application/json', 'Content-Type': 'application/json'}",
+      "request = urllib.request.Request(url, headers=headers)",
+      "with urllib.request.urlopen(request, timeout=30) as response:",
+      "    themes_data = json.loads(response.read().decode('utf-8'))",
+      "characters = {}",
+      "try:",
+      "    ani_query = json.dumps({",
+      "      'query': 'query ($id: Int) { Media(id: $id, type: ANIME) { characters(page: 1, perPage: 25) { edges { role node { id name { full native } image { large medium } siteUrl } voiceActors { id name { full native } image { large medium } siteUrl primaryOccupations } } } } }',",
+      "      'variables': {'id': int(anilist_id)}",
+      "    }).encode('utf-8')",
+      "    ani_req = urllib.request.Request('https://graphql.anilist.co', data=ani_query, headers=headers)",
+      "    with urllib.request.urlopen(ani_req, timeout=30) as response:",
+      "        anilist_data = json.loads(response.read().decode('utf-8'))",
+      "    characters = (((anilist_data or {}).get('data') or {}).get('Media') or {}).get('characters') or {}",
+      "except Exception:",
+      "    characters = {}",
+      "print(json.dumps({'anilistId': anilist_id, 'themes': themes_data, 'characters': characters}))"
+    ].join('\n');
+
+    return ['python3', '-c', code, String(anilistId || ''), defaultUserAgent, apiBaseUrl];
   }
 
   function absoluteUrl(value, fallbackHost) {
@@ -150,13 +140,12 @@ Item {
       if (item.original)
         candidates.push(item.original);
       if (item.facets) {
-        var facets = item.facets;
-        if (facets.large)
-          candidates.push(facets.large);
-        if (facets.medium)
-          candidates.push(facets.medium);
-        if (facets.small)
-          candidates.push(facets.small);
+        if (item.facets.large)
+          candidates.push(item.facets.large);
+        if (item.facets.medium)
+          candidates.push(item.facets.medium);
+        if (item.facets.small)
+          candidates.push(item.facets.small);
       }
       for (var j = 0; j < candidates.length; ++j) {
         var candidate = supportedImageUrl(candidates[j], apiBaseUrl);
@@ -183,6 +172,41 @@ Item {
     var lyricsPenalty = video && video.lyrics ? -2000 : 0;
     var ncBonus = video && video.nc ? 50 : 0;
     return resolution + lyricsPenalty + ncBonus;
+  }
+
+  function titleFromMedia(media) {
+    var title = media && media.title ? media.title : {};
+    return String(title.english || title.romaji || title.native || "Unknown anime");
+  }
+
+  function mapSearchMedia(media) {
+    var anilistId = String(media && media.id || "");
+    if (anilistId === "")
+      return null;
+    var cover = media && media.coverImage ? (media.coverImage.large || media.coverImage.medium || "") : "";
+    var pageUrl = "https://anilist.co/anime/" + anilistId;
+    return {
+      "id": anilistId,
+      "anilistId": anilistId,
+      "slug": "",
+      "name": titleFromMedia(media),
+      "year": parseInt(media && media.seasonYear || 0, 10) || 0,
+      "season": String(media && media.season || ""),
+      "mediaFormat": String(media && media.format || "").replace(/_/g, " "),
+      "synopsis": String(media && media.description || ""),
+      "coverUrl": supportedImageUrl(cover, apiBaseUrl),
+      "pageUrl": pageUrl,
+      "studios": [],
+      "resources": [{ "site": "AniList", "externalId": anilistId, "link": pageUrl }],
+      "animethemes": [],
+      "characters": [],
+      "openingCount": 0,
+      "endingCount": 0,
+      "themeCount": 0,
+      "detailsLoaded": false,
+      "detailsLoading": false,
+      "detailsError": ""
+    };
   }
 
   function simplifyTheme(theme, animePageUrl) {
@@ -221,6 +245,7 @@ Item {
     }).filter(function(name) {
       return name !== "";
     }) : [];
+
     var bestVideo = null;
     for (var i = 0; i < entryItems.length; ++i) {
       if (entryItems[i].videos.length > 0) {
@@ -246,7 +271,45 @@ Item {
     };
   }
 
-  function mapAnimeItem(item) {
+  function anilistIdFromResources(resources) {
+    var list = Array.isArray(resources) ? resources : [];
+    for (var i = 0; i < list.length; ++i) {
+      var resource = list[i] || {};
+      if (String(resource.site || "").toLowerCase() === "anilist")
+        return String(resource.external_id || resource.externalId || "");
+    }
+    return "";
+  }
+
+  function mapCharacterEntries(edges) {
+    var list = Array.isArray(edges) ? edges : [];
+    return list.map(function(edge) {
+      var character = edge && edge.node ? edge.node : {};
+      var voiceActors = Array.isArray(edge && edge.voiceActors) ? edge.voiceActors : [];
+      return {
+        "id": String(character && character.id || ""),
+        "name": String(character && character.name && character.name.full || "Unknown character"),
+        "nativeName": String(character && character.name && character.name.native || ""),
+        "imageUrl": supportedImageUrl(character && character.image && (character.image.large || character.image.medium) || "", apiBaseUrl),
+        "pageUrl": String(character && character.siteUrl || ""),
+        "role": String(edge && edge.role || ""),
+        "voiceActors": voiceActors.map(function(actor) {
+          return {
+            "id": String(actor && actor.id || ""),
+            "name": String(actor && actor.name && actor.name.full || "Unknown VA"),
+            "nativeName": String(actor && actor.name && actor.name.native || ""),
+            "imageUrl": supportedImageUrl(actor && actor.image && (actor.image.large || actor.image.medium) || "", apiBaseUrl),
+            "pageUrl": String(actor && actor.siteUrl || ""),
+            "primaryOccupations": Array.isArray(actor && actor.primaryOccupations) ? actor.primaryOccupations : []
+          };
+        })
+      };
+    }).filter(function(entry) {
+      return entry.id !== "" || entry.name !== "";
+    });
+  }
+
+  function mapAnimeDetail(item) {
     var slug = String(item && item.slug || "");
     var animePageUrl = item && (item.link || item.site_url) ? String(item.link || item.site_url) : (slug !== "" ? ("https://animethemes.moe/anime/" + slug) : "");
     var animethemes = Array.isArray(item && item.animethemes) ? item.animethemes.map(function(theme) {
@@ -271,16 +334,35 @@ Item {
     var studios = Array.isArray(item && item.studios) ? item.studios.map(function(studio) {
       return String(studio && studio.name || "");
     }).filter(function(name) { return name !== ""; }) : [];
+    var anilistId = anilistIdFromResources(resources);
 
     return {
-      "id": String(item && (item.id || item.slug || item.name) || ""),
+      "id": anilistId !== "" ? anilistId : String(item && (item.id || item.slug || item.name) || ""),
+      "anilistId": anilistId,
       "slug": slug,
       "name": String(item && (item.name || item.slug || "Unknown anime") || "Unknown anime"),
+      "titleRomaji": "",
+      "titleEnglish": "",
+      "titleNative": "",
+      "synonyms": [],
       "year": parseInt(item && item.year || 0, 10) || 0,
       "season": String(item && item.season || ""),
       "mediaFormat": String(item && (item.media_format || item.type || item.kind) || ""),
+      "status": "",
+      "episodes": 0,
+      "duration": 0,
+      "averageScore": 0,
+      "meanScore": 0,
+      "popularity": 0,
+      "favourites": 0,
+      "genres": [],
+      "countryOfOrigin": "",
+      "hashtag": "",
+      "startDate": null,
+      "endDate": null,
       "synopsis": String(item && (item.synopsis || item.description || "") || ""),
       "coverUrl": pickImage(item && item.images, item && item._fallback_cover),
+      "bannerUrl": "",
       "pageUrl": animePageUrl,
       "studios": studios,
       "resources": resources.map(function(resource) {
@@ -291,25 +373,54 @@ Item {
         };
       }),
       "animethemes": animethemes,
+      "characters": [],
       "openingCount": openings,
       "endingCount": endings,
-      "themeCount": animethemes.length
+      "themeCount": animethemes.length,
+      "detailsLoaded": true,
+      "detailsLoading": false,
+      "detailsError": ""
     };
   }
 
   function parseSearchResponse(rawText) {
     var parsed = JSON.parse(String(rawText || "{}"));
-    var animeList = [];
-    if (Array.isArray(parsed && parsed.anime))
-      animeList = parsed.anime;
-    else if (Array.isArray(parsed && parsed.data))
-      animeList = parsed.data;
-
-    return animeList.map(function(item) {
-      return mapAnimeItem(item);
+    var mediaList = Array.isArray(parsed && parsed.results) ? parsed.results : [];
+    return mediaList.map(function(media) {
+      return mapSearchMedia(media);
     }).filter(function(item) {
-      return item.id !== "" && item.themeCount > 0;
+      return !!item;
     });
+  }
+
+  function parseDetailResponse(rawText) {
+    var parsed = JSON.parse(String(rawText || "{}"));
+    var themesPayload = parsed && parsed.themes ? parsed.themes : parsed;
+    var characterEdges = parsed && parsed.characters && Array.isArray(parsed.characters.edges) ? parsed.characters.edges : [];
+    var animeList = [];
+    if (Array.isArray(themesPayload && themesPayload.anime))
+      animeList = themesPayload.anime;
+    else if (Array.isArray(themesPayload && themesPayload.data))
+      animeList = themesPayload.data;
+    var anime = null;
+    if (animeList && animeList.length > 0) {
+      anime = mapAnimeDetail(animeList[0]);
+    } else {
+      anime = {
+        "id": String(parsed && parsed.anilistId || ""),
+        "anilistId": String(parsed && parsed.anilistId || ""),
+        "animethemes": [],
+        "characters": [],
+        "openingCount": 0,
+        "endingCount": 0,
+        "themeCount": 0,
+        "detailsLoaded": true,
+        "detailsLoading": false,
+        "detailsError": ""
+      };
+    }
+    anime.characters = mapCharacterEntries(characterEdges);
+    return anime;
   }
 
   function searchAnime(query, pageSize) {
@@ -321,58 +432,156 @@ Item {
 
     var request = {
       "query": normalizedQuery,
-      "pageSize": Math.max(1, parseInt(pageSize || 12, 10) || 12)
+      "pageSize": Math.max(1, parseInt(pageSize || 12, 10) || 12),
+      "cacheKey": searchCacheKey(normalizedQuery, pageSize)
     };
 
-    if (searchProcess.running) {
-      pendingRequest = request;
+    if (root.searchCache[request.cacheKey]) {
+      Qt.callLater(function() {
+        root.searchFinished({
+          "query": request.query,
+          "pageSize": request.pageSize,
+          "results": root.searchCache[request.cacheKey],
+          "cached": true
+        });
+      });
       return;
     }
 
-    activeRequest = request;
-    requestStdout = "";
-    requestStderr = "";
+    if (searchProcess.running) {
+      pendingSearchRequest = request;
+      return;
+    }
+
+    activeSearchRequest = request;
+    searchStdout = "";
+    searchStderr = "";
     searchProcess.command = buildSearchCommand(request.query, request.pageSize);
     searchProcess.running = true;
+  }
+
+  function loadAnimeDetails(animeId, anilistId) {
+    var resolvedAnimeId = String(animeId || anilistId || "");
+    var resolvedAnilistId = String(anilistId || animeId || "");
+    if (resolvedAnilistId === "") {
+      root.detailFailed(resolvedAnimeId, "Missing AniList ID for this anime.");
+      return;
+    }
+
+    var request = {
+      "animeId": resolvedAnimeId,
+      "anilistId": resolvedAnilistId,
+      "cacheKey": detailCacheKey(resolvedAnilistId)
+    };
+
+    if (root.detailCache[request.cacheKey]) {
+      Qt.callLater(function() {
+        root.detailFinished({
+          "animeId": request.animeId,
+          "anime": root.detailCache[request.cacheKey],
+          "cached": true
+        });
+      });
+      return;
+    }
+
+    if (detailProcess.running) {
+      pendingDetailRequest = request;
+      return;
+    }
+
+    activeDetailRequest = request;
+    detailStdout = "";
+    detailStderr = "";
+    detailProcess.command = buildDetailCommand(request.anilistId);
+    detailProcess.running = true;
   }
 
   Process {
     id: searchProcess
 
     stdout: StdioCollector {
-      onStreamFinished: root.requestStdout = text || ""
+      onStreamFinished: root.searchStdout = text || ""
     }
 
     stderr: StdioCollector {
-      onStreamFinished: root.requestStderr = text || ""
+      onStreamFinished: root.searchStderr = text || ""
     }
 
     onExited: function(exitCode) {
-      var request = root.activeRequest;
-      root.activeRequest = null;
+      var request = root.activeSearchRequest;
+      root.activeSearchRequest = null;
+
       if (request) {
         if (exitCode === 0) {
           try {
-            var results = root.parseSearchResponse(root.requestStdout);
+            var results = root.parseSearchResponse(root.searchStdout);
+            root.searchCache[request.cacheKey] = results;
             root.searchFinished({
               "query": request.query,
               "pageSize": request.pageSize,
               "results": results
             });
           } catch (error) {
-            console.log("[AnimeThemes] Failed to parse response:", error);
-            root.searchFailed("AnimeThemes returned data in an unexpected format.");
+            console.log("[AnimeThemes] Failed to parse search response:", error);
+            root.searchFailed("AnimeThemes search returned data in an unexpected format.");
           }
         } else {
-          console.log("[AnimeThemes] Search failed:", root.requestStderr || ("search exited " + exitCode));
+          console.log("[AnimeThemes] Search failed:", root.searchStderr || ("search exited " + exitCode));
           root.searchFailed("AnimeThemes search failed. Check your network connection or try again.");
         }
       }
 
-      if (root.pendingRequest) {
-        var next = root.pendingRequest;
-        root.pendingRequest = null;
+      if (root.pendingSearchRequest) {
+        var next = root.pendingSearchRequest;
+        root.pendingSearchRequest = null;
         root.searchAnime(next.query, next.pageSize);
+      }
+    }
+  }
+
+  Process {
+    id: detailProcess
+
+    stdout: StdioCollector {
+      onStreamFinished: root.detailStdout = text || ""
+    }
+
+    stderr: StdioCollector {
+      onStreamFinished: root.detailStderr = text || ""
+    }
+
+    onExited: function(exitCode) {
+      var request = root.activeDetailRequest;
+      root.activeDetailRequest = null;
+
+      if (request) {
+        if (exitCode === 0) {
+          try {
+            var anime = root.parseDetailResponse(root.detailStdout);
+            if (anime) {
+              root.detailCache[request.cacheKey] = anime;
+              root.detailFinished({
+                "animeId": request.animeId,
+                "anime": anime
+              });
+            } else {
+              root.detailFailed(request.animeId, "No AnimeThemes data found for this anime.");
+            }
+          } catch (error) {
+            console.log("[AnimeThemes] Failed to parse detail response:", error);
+            root.detailFailed(request.animeId, "AnimeThemes detail data returned in an unexpected format.");
+          }
+        } else {
+          console.log("[AnimeThemes] Detail fetch failed:", root.detailStderr || ("detail exited " + exitCode));
+          root.detailFailed(request.animeId, "Failed to load AnimeThemes details for this anime.");
+        }
+      }
+
+      if (root.pendingDetailRequest) {
+        var next = root.pendingDetailRequest;
+        root.pendingDetailRequest = null;
+        root.loadAnimeDetails(next.animeId, next.anilistId);
       }
     }
   }

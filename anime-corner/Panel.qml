@@ -117,7 +117,7 @@ Item {
               Item { Layout.fillWidth: true }
 
               NText {
-                text: currentTab === 0 ? "Art boards" : "OP/ED themes"
+                text: currentTab === 0 ? "Art boards" : "Anime"
                 color: Color.mOnSurfaceVariant
                 pointSize: Style.fontSizeS
               }
@@ -133,7 +133,7 @@ Item {
         onCurrentIndexChanged: root.currentTab = currentIndex
 
         TabButton { text: "Boards" }
-        TabButton { text: "Themes" }
+        TabButton { text: "Anime" }
       }
 
       StackLayout {

@@ -1,7 +1,7 @@
 {
   "id": "anime-corner",
   "name": "Anime Corner",
-  "version": "1.5.3",
+  "version": "1.6.0",
   "minNoctaliaVersion": "4.1.2",
   "author": "OpenAI",
   "license": "MIT",
@@ -46,7 +46,8 @@
       "animethemes": {
         "pageSize": 12,
         "recentSearchLimit": 20,
-        "mpvCommand": "mpv"
+        "mpvCommand": "mpv",
+        "onAnimeChangeTabBehavior": "info"
       }
     }
   }

@@ -16,6 +16,7 @@ Item {
   property int pageSize: pluginApi?.pluginSettings?.animethemes?.pageSize ?? pluginApi?.manifest?.metadata?.defaultSettings?.animethemes?.pageSize ?? 12
   property int recentSearchLimit: pluginApi?.pluginSettings?.animethemes?.recentSearchLimit ?? pluginApi?.manifest?.metadata?.defaultSettings?.animethemes?.recentSearchLimit ?? 20
   property string mpvCommand: pluginApi?.pluginSettings?.animethemes?.mpvCommand || pluginApi?.manifest?.metadata?.defaultSettings?.animethemes?.mpvCommand || "mpv"
+  property string onAnimeChangeTabBehavior: pluginApi?.pluginSettings?.animethemes?.onAnimeChangeTabBehavior || pluginApi?.manifest?.metadata?.defaultSettings?.animethemes?.onAnimeChangeTabBehavior || "info"
 
   property string searchText: ""
   property string lastSubmittedSearchText: ""
@@ -173,7 +174,7 @@ Item {
       "anilistId": String(detailAnime.anilistId || existingAnime.anilistId || animeId)
     });
 
-    ["name", "titleRomaji", "titleEnglish", "titleNative", "season", "mediaFormat", "status", "countryOfOrigin", "hashtag", "synopsis", "coverUrl", "bannerUrl", "pageUrl", "slug"].forEach(function(key) {
+    ["name", "titleRomaji", "titleEnglish", "titleNative", "season", "mediaFormat", "status", "countryOfOrigin", "hashtag", "source", "synopsis", "coverUrl", "bannerUrl", "pageUrl", "slug"].forEach(function(key) {
       if ((mergedAnime[key] === undefined || mergedAnime[key] === null || mergedAnime[key] === "") && existingAnime[key] !== undefined)
         mergedAnime[key] = existingAnime[key];
     });
@@ -188,6 +189,8 @@ Item {
         mergedAnime[key] = existingAnime[key];
     });
 
+    if ((mergedAnime.isAdult === undefined || mergedAnime.isAdult === null) && existingAnime.isAdult !== undefined)
+      mergedAnime.isAdult = existingAnime.isAdult;
     if ((!mergedAnime.startDate || !mergedAnime.startDate.year) && existingAnime.startDate && existingAnime.startDate.year)
       mergedAnime.startDate = existingAnime.startDate;
     if ((!mergedAnime.endDate || !mergedAnime.endDate.year) && existingAnime.endDate && existingAnime.endDate.year)
@@ -240,6 +243,7 @@ Item {
   function refreshFilteredResults(autoSelectSingle, preservePosition) {
     if (preservePosition && animeListView)
       animeListScrollY = animeListView.contentY;
+    var previousSelectedId = String(selectedAnimeId || "");
     var list = (animeResults || []).filter(function(anime) {
       return passesFilters(anime);
     });
@@ -250,6 +254,9 @@ Item {
     } else if (selectedAnimeId !== "" && !findAnimeById(selectedAnimeId, list)) {
       selectedAnimeId = list.length > 0 ? String(list[0].id || "") : "";
     }
+
+    if (previousSelectedId !== String(selectedAnimeId || "") && String(selectedAnimeId || "") !== "" && onAnimeChangeTabBehavior === "info")
+      animeRightTab = 0;
 
     updateSelectedAnime(list);
     if (selectedAnime)
@@ -349,8 +356,12 @@ Item {
       return;
     if (animeListView)
       animeListScrollY = animeListView.contentY;
+    var nextId = String(anime.id || "");
+    var changed = nextId !== "" && nextId !== String(selectedAnimeId || "");
     clearPlayerStatus();
-    selectedAnimeId = String(anime.id || "");
+    selectedAnimeId = nextId;
+    if (changed && onAnimeChangeTabBehavior === "info")
+      animeRightTab = 0;
     updateSelectedAnime(filteredResults);
     ensureAnimeDetails(selectedAnime || anime);
     Qt.callLater(function() { root.restoreAnimeListPosition(); });
@@ -905,24 +916,140 @@ Item {
           anchors.margins: Style.marginM
           spacing: Style.marginS
 
-          RowLayout {
+          Rectangle {
             Layout.fillWidth: true
+            visible: !!(root.selectedAnime && root.selectedAnime.bannerUrl)
+            implicitHeight: visible ? Math.max(120, width * 0.22) : 0
+            radius: Style.radiusM
+            color: Color.mSurfaceVariant
+            border.color: Color.mOutline
+            border.width: 1
+            clip: true
 
-            NText {
-              text: root.selectedAnime ? root.selectedAnime.name : "Anime"
-              pointSize: Style.fontSizeS
-              font.weight: Font.DemiBold
-              color: Color.mOnSurface
-              Layout.fillWidth: true
-              wrapMode: Text.Wrap
+            Image {
+              anchors.fill: parent
+              source: root.selectedAnime ? (root.selectedAnime.bannerUrl || "") : ""
+              asynchronous: true
+              fillMode: Image.PreserveAspectCrop
             }
+          }
 
-            NText {
-              text: root.playerStatusMessage
-              color: Color.mOnSurfaceVariant
-              pointSize: Style.fontSizeXS
-              applyUiScale: false
-              visible: text !== "" && root.animeRightTab === 2
+          Rectangle {
+            Layout.fillWidth: true
+            implicitHeight: sharedHeaderRow.implicitHeight + Style.marginM * 2
+            radius: Style.radiusM
+            color: Color.mSurface
+            border.color: Color.mOutline
+            border.width: 1
+
+            RowLayout {
+              id: sharedHeaderRow
+              anchors.fill: parent
+              anchors.margins: Style.marginM
+              spacing: Style.marginM
+
+              Rectangle {
+                Layout.preferredWidth: 132
+                Layout.preferredHeight: 180
+                radius: Style.radiusM
+                color: Color.mSurfaceVariant
+                border.color: Color.mOutline
+                border.width: 1
+                clip: true
+
+                Image {
+                  anchors.fill: parent
+                  source: root.selectedAnime ? (root.selectedAnime.coverUrl || "") : ""
+                  asynchronous: true
+                  fillMode: Image.PreserveAspectCrop
+                }
+              }
+
+              ColumnLayout {
+                Layout.fillWidth: true
+                spacing: Style.marginS
+
+                NText {
+                  text: root.selectedAnime ? root.selectedAnime.name : ""
+                  pointSize: Style.fontSizeM
+                  font.weight: Font.DemiBold
+                  color: Color.mOnSurface
+                  Layout.fillWidth: true
+                  wrapMode: Text.Wrap
+                }
+
+                NText {
+                  text: [root.selectedAnime ? root.selectedAnime.titleRomaji : "", root.selectedAnime ? root.selectedAnime.titleEnglish : "", root.selectedAnime ? root.selectedAnime.titleNative : ""].filter(function(part, index, arr) { return part && arr.indexOf(part) === index; }).join(" • ")
+                  visible: text !== ""
+                  color: Color.mOnSurfaceVariant
+                  Layout.fillWidth: true
+                  wrapMode: Text.Wrap
+                }
+
+                Flow {
+                  Layout.fillWidth: true
+                  spacing: Style.marginXS
+                  visible: !!root.selectedAnime && root.infoChips(root.selectedAnime).length > 0
+
+                  Repeater {
+                    model: root.selectedAnime ? root.infoChips(root.selectedAnime) : []
+                    delegate: Rectangle {
+                      required property var modelData
+                      radius: Style.radiusM
+                      color: root.secondaryContainerColor
+                      border.color: Color.mOutline
+                      border.width: 1
+                      height: chipInfoLabel.implicitHeight + Style.marginS
+                      width: chipInfoLabel.implicitWidth + Style.marginM * 2
+
+                      NText {
+                        id: chipInfoLabel
+                        anchors.centerIn: parent
+                        text: String(modelData || "")
+                        color: root.onSecondaryContainerColor
+                        pointSize: Style.fontSizeXS
+                        applyUiScale: false
+                      }
+                    }
+                  }
+                }
+
+                NText {
+                  text: root.statsLine(root.selectedAnime)
+                  visible: text !== ""
+                  color: Color.mOnSurface
+                  Layout.fillWidth: true
+                  wrapMode: Text.Wrap
+                }
+
+                NText {
+                  text: root.selectedAnime ? ("Themes: " + (root.selectedAnime.themeCount || 0) + " • OP " + (root.selectedAnime.openingCount || 0) + " • ED " + (root.selectedAnime.endingCount || 0)) : ""
+                  color: Color.mOnSurfaceVariant
+                  Layout.fillWidth: true
+                  wrapMode: Text.Wrap
+                }
+
+                RowLayout {
+                  Layout.fillWidth: true
+                  spacing: Style.marginS
+
+                  NButton {
+                    text: "Open AniList"
+                    enabled: !!(root.selectedAnime && root.selectedAnime.pageUrl)
+                    onClicked: root.openUrl(root.selectedAnime ? root.selectedAnime.pageUrl : "")
+                  }
+
+                  Item { Layout.fillWidth: true }
+
+                  NText {
+                    text: root.playerStatusMessage
+                    color: Color.mOnSurfaceVariant
+                    pointSize: Style.fontSizeXS
+                    applyUiScale: false
+                    visible: text !== "" && root.animeRightTab === 2
+                  }
+                }
+              }
             }
           }
 
@@ -946,6 +1073,7 @@ Item {
             Layout.fillWidth: true
             Layout.fillHeight: true
             currentIndex: root.animeRightTab
+
             Item {
               ScrollView {
                 anchors.fill: parent
@@ -957,131 +1085,30 @@ Item {
 
                   Rectangle {
                     Layout.fillWidth: true
-                    implicitHeight: infoHeaderRow.implicitHeight + Style.marginM * 2
+                    implicitHeight: synopsisInfoColumn.implicitHeight + Style.marginM * 2
                     radius: Style.radiusM
                     color: Color.mSurface
                     border.color: Color.mOutline
                     border.width: 1
 
-                    RowLayout {
-                      id: infoHeaderRow
+                    ColumnLayout {
+                      id: synopsisInfoColumn
                       anchors.fill: parent
                       anchors.margins: Style.marginM
-                      spacing: Style.marginM
+                      spacing: Style.marginS
 
-                      Rectangle {
-                        Layout.preferredWidth: 132
-                        Layout.preferredHeight: 180
-                        radius: Style.radiusM
-                        color: Color.mSurfaceVariant
-                        border.color: Color.mOutline
-                        border.width: 1
-                        clip: true
-
-                        Image {
-                          anchors.fill: parent
-                          source: root.selectedAnime ? (root.selectedAnime.coverUrl || "") : ""
-                          asynchronous: true
-                          fillMode: Image.PreserveAspectCrop
-                        }
+                      NText {
+                        text: "Synopsis"
+                        color: Color.mOnSurface
+                        font.weight: Font.DemiBold
                       }
 
-                      ColumnLayout {
-                        id: infoHeaderColumn
+                      NText {
                         Layout.fillWidth: true
-                        spacing: Style.marginS
-
-                        NText {
-                          text: root.selectedAnime ? root.selectedAnime.name : ""
-                          pointSize: Style.fontSizeM
-                          font.weight: Font.DemiBold
-                          color: Color.mOnSurface
-                          Layout.fillWidth: true
-                          wrapMode: Text.Wrap
-                        }
-
-                        NText {
-                          text: [root.selectedAnime ? root.selectedAnime.titleRomaji : "", root.selectedAnime ? root.selectedAnime.titleEnglish : "", root.selectedAnime ? root.selectedAnime.titleNative : ""].filter(function(part, index, arr) { return part && arr.indexOf(part) === index; }).join(" • ")
-                          visible: text !== ""
-                          color: Color.mOnSurfaceVariant
-                          Layout.fillWidth: true
-                          wrapMode: Text.Wrap
-                        }
-
-                        Flow {
-                          Layout.fillWidth: true
-                          spacing: Style.marginXS
-                          visible: !!root.selectedAnime && root.infoChips(root.selectedAnime).length > 0
-
-                          Repeater {
-                            model: root.selectedAnime ? root.infoChips(root.selectedAnime) : []
-                            delegate: Rectangle {
-                              required property var modelData
-                              radius: Style.radiusM
-                              color: root.secondaryContainerColor
-                              border.color: Color.mOutline
-                              border.width: 1
-                              height: chipInfoLabel.implicitHeight + Style.marginS
-                              width: chipInfoLabel.implicitWidth + Style.marginM * 2
-
-                              NText {
-                                id: chipInfoLabel
-                                anchors.centerIn: parent
-                                text: String(modelData || "")
-                                color: root.onSecondaryContainerColor
-                                pointSize: Style.fontSizeXS
-                                applyUiScale: false
-                              }
-                            }
-                          }
-                        }
-
-                        NText {
-                          text: root.statsLine(root.selectedAnime)
-                          visible: text !== ""
-                          color: Color.mOnSurface
-                          Layout.fillWidth: true
-                          wrapMode: Text.Wrap
-                        }
-
-                        NText {
-                          text: root.selectedAnime ? ("Themes: " + (root.selectedAnime.themeCount || 0) + " • OP " + (root.selectedAnime.openingCount || 0) + " • ED " + (root.selectedAnime.endingCount || 0)) : ""
-                          color: Color.mOnSurfaceVariant
-                          Layout.fillWidth: true
-                          wrapMode: Text.Wrap
-                        }
-
-                        RowLayout {
-                          Layout.fillWidth: true
-                          spacing: Style.marginS
-
-                          NButton {
-                            text: "Open AniList"
-                            enabled: !!(root.selectedAnime && root.selectedAnime.pageUrl)
-                            onClicked: root.openUrl(root.selectedAnime ? root.selectedAnime.pageUrl : "")
-                          }
-
-                          Item { Layout.fillWidth: true }
-                        }
+                        text: root.selectedAnime && root.selectedAnime.synopsis ? root.selectedAnime.synopsis : "No synopsis available."
+                        color: Color.mOnSurfaceVariant
+                        wrapMode: Text.Wrap
                       }
-                    }
-                  }
-
-                  Rectangle {
-                    Layout.fillWidth: true
-                    visible: !!(root.selectedAnime && root.selectedAnime.bannerUrl)
-                    implicitHeight: visible ? Math.max(120, width * 0.22) : 0
-                    radius: Style.radiusM
-                    color: Color.mSurfaceVariant
-                    border.color: Color.mOutline
-                    border.width: 1
-                    clip: true
-
-                    Image {
-                      anchors.fill: parent
-                      source: root.selectedAnime ? (root.selectedAnime.bannerUrl || "") : ""
-                      asynchronous: true
-                      fillMode: Image.PreserveAspectCrop
                     }
                   }
 
@@ -1101,72 +1128,64 @@ Item {
                       rowSpacing: Style.marginS
                       columnSpacing: Style.marginM
 
-                      NText { text: "Season"; color: Color.mOnSurfaceVariant }
-                      NText { text: root.selectedAnime ? root.animeMetaLine(root.selectedAnime) : ""; color: Color.mOnSurface; wrapMode: Text.Wrap; Layout.fillWidth: true }
+                      NText { text: "Format"; color: Color.mOnSurfaceVariant; visible: (root.selectedAnime ? String(root.selectedAnime.mediaFormat || "") : "") !== "" }
+                      NText { text: root.selectedAnime ? String(root.selectedAnime.mediaFormat || "") : ""; color: Color.mOnSurface; visible: (root.selectedAnime ? String(root.selectedAnime.mediaFormat || "") : "") !== "" }
+
+                      NText { text: "Season"; color: Color.mOnSurfaceVariant; visible: (root.selectedAnime ? String(root.selectedAnime.season || "") : "") !== "" }
+                      NText { text: root.selectedAnime ? String(root.selectedAnime.season || "") : ""; color: Color.mOnSurface; visible: (root.selectedAnime ? String(root.selectedAnime.season || "") : "") !== "" }
 
                       NText { text: "Status"; color: Color.mOnSurfaceVariant; visible: (root.selectedAnime ? String(root.selectedAnime.status || "") : "") !== "" }
-                      NText { text: root.selectedAnime ? String(root.selectedAnime.status || "") : ""; color: Color.mOnSurface; wrapMode: Text.Wrap; Layout.fillWidth: true; visible: text !== "" }
+                      NText { text: root.selectedAnime ? String(root.selectedAnime.status || "") : ""; color: Color.mOnSurface; visible: (root.selectedAnime ? String(root.selectedAnime.status || "") : "") !== "" }
 
                       NText { text: "Dates"; color: Color.mOnSurfaceVariant; visible: root.dateRangeLine(root.selectedAnime) !== "" }
-                      NText { text: root.dateRangeLine(root.selectedAnime); color: Color.mOnSurface; wrapMode: Text.Wrap; Layout.fillWidth: true; visible: text !== "" }
+                      NText { text: root.dateRangeLine(root.selectedAnime); color: Color.mOnSurface; visible: root.dateRangeLine(root.selectedAnime) !== ""; wrapMode: Text.Wrap }
 
                       NText { text: "Episodes"; color: Color.mOnSurfaceVariant; visible: !!(root.selectedAnime && root.selectedAnime.episodes) }
-                      NText { text: root.selectedAnime && root.selectedAnime.episodes ? String(root.selectedAnime.episodes) : ""; color: Color.mOnSurface; wrapMode: Text.Wrap; Layout.fillWidth: true; visible: text !== "" }
+                      NText { text: root.selectedAnime ? String(root.selectedAnime.episodes || "") : ""; color: Color.mOnSurface; visible: !!(root.selectedAnime && root.selectedAnime.episodes) }
 
                       NText { text: "Duration"; color: Color.mOnSurfaceVariant; visible: !!(root.selectedAnime && root.selectedAnime.duration) }
-                      NText { text: root.selectedAnime && root.selectedAnime.duration ? (String(root.selectedAnime.duration) + " min") : ""; color: Color.mOnSurface; wrapMode: Text.Wrap; Layout.fillWidth: true; visible: text !== "" }
+                      NText { text: root.selectedAnime ? (String(root.selectedAnime.duration || "") + " min") : ""; color: Color.mOnSurface; visible: !!(root.selectedAnime && root.selectedAnime.duration) }
+
+                      NText { text: "Rating"; color: Color.mOnSurfaceVariant; visible: !!(root.selectedAnime && root.selectedAnime.averageScore) }
+                      NText { text: root.selectedAnime ? String(root.selectedAnime.averageScore || "") : ""; color: Color.mOnSurface; visible: !!(root.selectedAnime && root.selectedAnime.averageScore) }
+
+                      NText { text: "Mean score"; color: Color.mOnSurfaceVariant; visible: !!(root.selectedAnime && root.selectedAnime.meanScore) }
+                      NText { text: root.selectedAnime ? String(root.selectedAnime.meanScore || "") : ""; color: Color.mOnSurface; visible: !!(root.selectedAnime && root.selectedAnime.meanScore) }
+
+                      NText { text: "Popularity"; color: Color.mOnSurfaceVariant; visible: !!(root.selectedAnime && root.selectedAnime.popularity) }
+                      NText { text: root.selectedAnime ? String(root.selectedAnime.popularity || "") : ""; color: Color.mOnSurface; visible: !!(root.selectedAnime && root.selectedAnime.popularity) }
+
+                      NText { text: "Favourites"; color: Color.mOnSurfaceVariant; visible: !!(root.selectedAnime && root.selectedAnime.favourites) }
+                      NText { text: root.selectedAnime ? String(root.selectedAnime.favourites || "") : ""; color: Color.mOnSurface; visible: !!(root.selectedAnime && root.selectedAnime.favourites) }
+
+                      NText { text: "Source"; color: Color.mOnSurfaceVariant; visible: (root.selectedAnime ? String(root.selectedAnime.source || "") : "") !== "" }
+                      NText { text: root.selectedAnime ? String(root.selectedAnime.source || "") : ""; color: Color.mOnSurface; visible: (root.selectedAnime ? String(root.selectedAnime.source || "") : "") !== "" }
+
+                      NText { text: "Age rating"; color: Color.mOnSurfaceVariant; visible: !!root.selectedAnime }
+                      NText { text: root.selectedAnime ? (root.selectedAnime.isAdult ? "Adult" : "General") : ""; color: Color.mOnSurface; visible: !!root.selectedAnime }
 
                       NText { text: "Country"; color: Color.mOnSurfaceVariant; visible: (root.selectedAnime ? String(root.selectedAnime.countryOfOrigin || "") : "") !== "" }
-                      NText { text: root.selectedAnime ? String(root.selectedAnime.countryOfOrigin || "") : ""; color: Color.mOnSurface; wrapMode: Text.Wrap; Layout.fillWidth: true; visible: text !== "" }
+                      NText { text: root.selectedAnime ? String(root.selectedAnime.countryOfOrigin || "") : ""; color: Color.mOnSurface; visible: (root.selectedAnime ? String(root.selectedAnime.countryOfOrigin || "") : "") !== "" }
+
+                      NText { text: "Main studio"; color: Color.mOnSurfaceVariant; visible: !!(root.selectedAnime && root.selectedAnime.studios && root.selectedAnime.studios.length > 0) }
+                      NText { text: root.selectedAnime && root.selectedAnime.studios && root.selectedAnime.studios.length > 0 ? String(root.selectedAnime.studios[0] || "") : ""; color: Color.mOnSurface; visible: !!(root.selectedAnime && root.selectedAnime.studios && root.selectedAnime.studios.length > 0); wrapMode: Text.Wrap }
 
                       NText { text: "Studios"; color: Color.mOnSurfaceVariant; visible: !!(root.selectedAnime && root.selectedAnime.studios && root.selectedAnime.studios.length > 0) }
-                      NText { text: root.selectedAnime && root.selectedAnime.studios && root.selectedAnime.studios.length > 0 ? root.selectedAnime.studios.join(", ") : ""; color: Color.mOnSurface; wrapMode: Text.Wrap; Layout.fillWidth: true; visible: text !== "" }
+                      NText { text: root.selectedAnime && root.selectedAnime.studios && root.selectedAnime.studios.length > 0 ? root.selectedAnime.studios.join(", ") : ""; color: Color.mOnSurface; visible: !!(root.selectedAnime && root.selectedAnime.studios && root.selectedAnime.studios.length > 0); wrapMode: Text.Wrap }
 
                       NText { text: "Genres"; color: Color.mOnSurfaceVariant; visible: !!(root.selectedAnime && root.selectedAnime.genres && root.selectedAnime.genres.length > 0) }
-                      NText { text: root.selectedAnime && root.selectedAnime.genres && root.selectedAnime.genres.length > 0 ? root.selectedAnime.genres.join(", ") : ""; color: Color.mOnSurface; wrapMode: Text.Wrap; Layout.fillWidth: true; visible: text !== "" }
+                      NText { text: root.selectedAnime && root.selectedAnime.genres && root.selectedAnime.genres.length > 0 ? root.selectedAnime.genres.join(", ") : ""; color: Color.mOnSurface; visible: !!(root.selectedAnime && root.selectedAnime.genres && root.selectedAnime.genres.length > 0); wrapMode: Text.Wrap }
 
                       NText { text: "Synonyms"; color: Color.mOnSurfaceVariant; visible: !!(root.selectedAnime && root.selectedAnime.synonyms && root.selectedAnime.synonyms.length > 0) }
-                      NText { text: root.selectedAnime && root.selectedAnime.synonyms && root.selectedAnime.synonyms.length > 0 ? root.selectedAnime.synonyms.join(", ") : ""; color: Color.mOnSurface; wrapMode: Text.Wrap; Layout.fillWidth: true; visible: text !== "" }
-
-                      NText { text: "Stats"; color: Color.mOnSurfaceVariant; visible: root.statsLine(root.selectedAnime) !== "" }
-                      NText { text: root.statsLine(root.selectedAnime); color: Color.mOnSurface; wrapMode: Text.Wrap; Layout.fillWidth: true; visible: text !== "" }
+                      NText { text: root.selectedAnime && root.selectedAnime.synonyms && root.selectedAnime.synonyms.length > 0 ? root.selectedAnime.synonyms.join(", ") : ""; color: Color.mOnSurface; visible: !!(root.selectedAnime && root.selectedAnime.synonyms && root.selectedAnime.synonyms.length > 0); wrapMode: Text.Wrap }
 
                       NText { text: "Hashtag"; color: Color.mOnSurfaceVariant; visible: (root.selectedAnime ? String(root.selectedAnime.hashtag || "") : "") !== "" }
-                      NText { text: root.selectedAnime ? String(root.selectedAnime.hashtag || "") : ""; color: Color.mOnSurface; wrapMode: Text.Wrap; Layout.fillWidth: true; visible: text !== "" }
+                      NText { text: root.selectedAnime ? String(root.selectedAnime.hashtag || "") : ""; color: Color.mOnSurface; visible: (root.selectedAnime ? String(root.selectedAnime.hashtag || "") : "") !== "" }
 
                       NText { text: "Loaded cast"; color: Color.mOnSurfaceVariant; visible: !!root.selectedAnime }
-                      NText { text: root.selectedAnime ? String(root.selectedAnimeCharactersModel.length || 0) : "0"; color: Color.mOnSurface; wrapMode: Text.Wrap; Layout.fillWidth: true; visible: !!root.selectedAnime }
+                      NText { text: root.selectedAnime ? String(root.selectedAnimeCharactersModel.length || 0) : "0"; color: Color.mOnSurface; visible: !!root.selectedAnime }
                     }
                   }
-                  Rectangle {
-                    Layout.fillWidth: true
-                    implicitHeight: synopsisInfoColumn.implicitHeight + Style.marginM * 2
-                    radius: Style.radiusM
-                    color: Color.mSurface
-                    border.color: Color.mOutline
-                    border.width: 1
-
-                    ColumnLayout {
-                      id: synopsisInfoColumn
-                      anchors.fill: parent
-                      anchors.margins: Style.marginM
-                      spacing: Style.marginS
-
-                      NText {
-                        text: "Synopsis"
-                        color: Color.mOnSurface
-                        font.weight: Font.Medium
-                      }
-
-                      NText {
-                        text: root.selectedAnime && root.selectedAnime.synopsis ? root.selectedAnime.synopsis : "No synopsis available."
-                        color: Color.mOnSurface
-                        Layout.fillWidth: true
-                        wrapMode: Text.Wrap
-                      }
-                    }
-                  }
-
                 }
               }
             }
@@ -1179,7 +1198,7 @@ Item {
                 Item {
                   NText {
                     anchors.centerIn: parent
-                    text: "Select an anime to browse characters and voice actors."
+                    text: "Pick an anime from the left to view cast information."
                     color: Color.mOnSurfaceVariant
                     wrapMode: Text.Wrap
                     width: parent.width - Style.marginL * 2
@@ -1195,117 +1214,116 @@ Item {
                     spacing: Style.marginXS
                     model: root.selectedAnimeCharactersModel
 
-                  delegate: Rectangle {
-                    required property var modelData
-                    readonly property var castItem: modelData || ({})
-                    readonly property var primaryVa: castItem.voiceActors && castItem.voiceActors.length > 0 ? castItem.voiceActors[0] : null
-                    width: castListView.width
-                    height: Math.max(112, castRow.implicitHeight + Style.marginS * 2)
-                    radius: Style.radiusM
-                    color: Color.mSurface
-                    border.color: Color.mOutline
-                    border.width: 1
+                    delegate: Rectangle {
+                      required property var modelData
+                      readonly property var castItem: modelData || ({})
+                      readonly property var primaryVa: castItem.voiceActors && castItem.voiceActors.length > 0 ? castItem.voiceActors[0] : null
+                      width: castListView.width
+                      height: Math.max(112, castRow.implicitHeight + Style.marginS * 2)
+                      radius: Style.radiusM
+                      color: Color.mSurface
+                      border.color: Color.mOutline
+                      border.width: 1
 
-                    RowLayout {
-                      id: castRow
-                      anchors.fill: parent
-                      anchors.margins: Style.marginS
-                      spacing: Style.marginS
+                      RowLayout {
+                        id: castRow
+                        anchors.fill: parent
+                        anchors.margins: Style.marginS
+                        spacing: Style.marginS
 
-                      Rectangle {
-                        Layout.preferredWidth: 72
-                        Layout.preferredHeight: 96
-                        radius: Style.radiusS
-                        color: Color.mSurfaceVariant
-                        clip: true
+                        Rectangle {
+                          Layout.preferredWidth: 72
+                          Layout.preferredHeight: 96
+                          radius: Style.radiusS
+                          color: Color.mSurfaceVariant
+                          clip: true
 
-                        Image {
-                          anchors.fill: parent
-                          source: castItem.imageUrl || ""
-                          asynchronous: true
-                          fillMode: Image.PreserveAspectCrop
+                          Image {
+                            anchors.fill: parent
+                            source: castItem.imageUrl || ""
+                            asynchronous: true
+                            fillMode: Image.PreserveAspectCrop
+                          }
                         }
-                      }
 
-                      Rectangle {
-                        Layout.preferredWidth: 72
-                        Layout.preferredHeight: 96
-                        radius: Style.radiusS
-                        color: Color.mSurfaceVariant
-                        border.color: Color.mOutline
-                        border.width: 1
-                        visible: !!(primaryVa && primaryVa.imageUrl)
-                        clip: true
+                        Rectangle {
+                          Layout.preferredWidth: 72
+                          Layout.preferredHeight: 96
+                          radius: Style.radiusS
+                          color: Color.mSurfaceVariant
+                          border.color: Color.mOutline
+                          border.width: 1
+                          visible: !!(primaryVa && primaryVa.imageUrl)
+                          clip: true
 
-                        Image {
-                          anchors.fill: parent
-                          source: primaryVa ? (primaryVa.imageUrl || "") : ""
-                          asynchronous: true
-                          fillMode: Image.PreserveAspectCrop
+                          Image {
+                            anchors.fill: parent
+                            source: primaryVa ? (primaryVa.imageUrl || "") : ""
+                            asynchronous: true
+                            fillMode: Image.PreserveAspectCrop
+                          }
                         }
-                      }
 
-                      ColumnLayout {
-                        Layout.fillWidth: true
-                        spacing: 2
-
-                        NText {
-                          text: castItem.name || "Character"
-                          color: Color.mOnSurface
-                          font.weight: Font.Medium
+                        ColumnLayout {
                           Layout.fillWidth: true
-                          wrapMode: Text.Wrap
+                          spacing: 2
+
+                          NText {
+                            text: castItem.name || "Character"
+                            color: Color.mOnSurface
+                            font.weight: Font.Medium
+                            Layout.fillWidth: true
+                            wrapMode: Text.Wrap
+                          }
+
+                          NText {
+                            text: castItem.nativeName || ""
+                            visible: text !== ""
+                            color: Color.mOnSurfaceVariant
+                            pointSize: Style.fontSizeXS
+                            applyUiScale: false
+                            Layout.fillWidth: true
+                            wrapMode: Text.Wrap
+                          }
+
+                          NText {
+                            text: castItem.role ? ("Role: " + castItem.role) : ""
+                            visible: text !== ""
+                            color: Color.mOnSurfaceVariant
+                            pointSize: Style.fontSizeXS
+                            applyUiScale: false
+                            Layout.fillWidth: true
+                            wrapMode: Text.Wrap
+                          }
+
+                          NText {
+                            text: primaryVa ? ("VA: " + primaryVa.name + (primaryVa.nativeName ? (" • " + primaryVa.nativeName) : "")) : "No voice actor listed"
+                            color: Color.mOnSurface
+                            pointSize: Style.fontSizeXS
+                            applyUiScale: false
+                            Layout.fillWidth: true
+                            wrapMode: Text.Wrap
+                          }
                         }
 
-                        NText {
-                          text: castItem.nativeName || ""
-                          visible: text !== ""
-                          color: Color.mOnSurfaceVariant
-                          pointSize: Style.fontSizeXS
-                          applyUiScale: false
-                          Layout.fillWidth: true
-                          wrapMode: Text.Wrap
-                        }
+                        ColumnLayout {
+                          spacing: Style.marginXS
+                          Layout.alignment: Qt.AlignTop
 
-                        NText {
-                          text: castItem.role ? ("Role: " + castItem.role) : ""
-                          visible: text !== ""
-                          color: Color.mOnSurfaceVariant
-                          pointSize: Style.fontSizeXS
-                          applyUiScale: false
-                          Layout.fillWidth: true
-                          wrapMode: Text.Wrap
-                        }
+                          NButton {
+                            text: "Character"
+                            enabled: !!castItem.pageUrl
+                            onClicked: root.openUrl(castItem.pageUrl)
+                          }
 
-                        NText {
-                          text: primaryVa ? ("VA: " + primaryVa.name + (primaryVa.nativeName ? (" • " + primaryVa.nativeName) : "")) : "No voice actor listed"
-                          color: Color.mOnSurface
-                          pointSize: Style.fontSizeXS
-                          applyUiScale: false
-                          Layout.fillWidth: true
-                          wrapMode: Text.Wrap
-                        }
-
-                      }
-
-                      ColumnLayout {
-                        spacing: Style.marginXS
-                        Layout.alignment: Qt.AlignTop
-
-                        NButton {
-                          text: "Character"
-                          enabled: !!castItem.pageUrl
-                          onClicked: root.openUrl(castItem.pageUrl)
-                        }
-
-                        NButton {
-                          text: "Voice actor"
-                          enabled: !!(primaryVa && primaryVa.pageUrl)
-                          onClicked: root.openUrl(primaryVa ? primaryVa.pageUrl : "")
+                          NButton {
+                            text: "Voice actor"
+                            enabled: !!(primaryVa && primaryVa.pageUrl)
+                            onClicked: root.openUrl(primaryVa ? primaryVa.pageUrl : "")
+                          }
                         }
                       }
                     }
-                  }
                   }
                 }
 
@@ -1321,6 +1339,7 @@ Item {
                 }
               }
             }
+
             Item {
               ColumnLayout {
                 anchors.fill: parent
@@ -1397,88 +1416,86 @@ Item {
                         spacing: Style.marginXS
                         model: root.selectedAnimeThemesModel
 
-                    delegate: Rectangle {
-                      required property var modelData
-                      readonly property var themeItem: modelData || ({})
-                      readonly property bool activeTheme: String(themeItem.id || "") === root.lastPlayedThemeId
-                      width: themesListView.width
-                      height: 108
-                      radius: Style.radiusM
-                      color: activeTheme ? root.tertiaryContainerColor : Color.mSurface
-                      border.color: activeTheme ? root.tertiaryColor : Color.mOutline
-                      border.width: 1
+                        delegate: Rectangle {
+                          required property var modelData
+                          readonly property var themeItem: modelData || ({})
+                          readonly property bool activeTheme: String(themeItem.id || "") === root.lastPlayedThemeId
+                          width: themesListView.width
+                          height: 108
+                          radius: Style.radiusM
+                          color: activeTheme ? root.tertiaryContainerColor : Color.mSurface
+                          border.color: activeTheme ? root.tertiaryColor : Color.mOutline
+                          border.width: 1
 
-                      RowLayout {
-                        anchors.fill: parent
-                        anchors.leftMargin: Style.marginM
-                        anchors.topMargin: Style.marginS
-                        anchors.rightMargin: Style.marginS
-                        anchors.bottomMargin: Style.marginS
-                        spacing: Style.marginS
+                          RowLayout {
+                            anchors.fill: parent
+                            anchors.leftMargin: Style.marginM
+                            anchors.topMargin: Style.marginS
+                            anchors.rightMargin: Style.marginS
+                            anchors.bottomMargin: Style.marginS
+                            spacing: Style.marginS
 
-                        ColumnLayout {
-                          Layout.fillWidth: true
-                          spacing: 2
+                            ColumnLayout {
+                              Layout.fillWidth: true
+                              spacing: 2
 
-                          NText {
-                            text: themeItem.displayName ? (themeItem.displayName + (themeItem.songTitle ? (" - " + themeItem.songTitle) : "")) : (themeItem.songTitle || "Theme")
-                            color: activeTheme ? root.onTertiaryContainerColor : Color.mOnSurface
-                            font.weight: Font.Medium
-                            elide: Text.ElideRight
-                            Layout.fillWidth: true
+                              NText {
+                                text: themeItem.displayName ? (themeItem.displayName + (themeItem.songTitle ? (" - " + themeItem.songTitle) : "")) : (themeItem.songTitle || "Theme")
+                                color: activeTheme ? root.onTertiaryContainerColor : Color.mOnSurface
+                                font.weight: Font.Medium
+                                elide: Text.ElideRight
+                                Layout.fillWidth: true
+                              }
+
+                              NText {
+                                text: themeItem.artists && themeItem.artists.length > 0 ? themeItem.artists.join(", ") : ""
+                                visible: text !== ""
+                                color: activeTheme ? root.onTertiaryContainerColor : Color.mOnSurfaceVariant
+                                pointSize: Style.fontSizeXS
+                                applyUiScale: false
+                                elide: Text.ElideRight
+                                Layout.fillWidth: true
+                              }
+
+                              NText {
+                                text: [themeItem.groupName || "", root.themeMetaLine(themeItem)].filter(function(part) { return String(part || "") !== ""; }).join(" • ")
+                                color: activeTheme ? root.onTertiaryContainerColor : Color.mOnSurfaceVariant
+                                pointSize: Style.fontSizeXS
+                                applyUiScale: false
+                                elide: Text.ElideRight
+                                Layout.fillWidth: true
+                              }
+                            }
+
+                            NButton {
+                              text: "Play"
+                              enabled: !!themeItem.bestVideoUrl
+                              onClicked: root.openThemeInMpv(themeItem)
+                            }
+
+                            NButton {
+                              text: "Open page"
+                              enabled: !!themeItem.pageUrl
+                              onClicked: root.openUrl(themeItem.pageUrl)
+                            }
                           }
 
-                          NText {
-                            text: themeItem.artists && themeItem.artists.length > 0 ? themeItem.artists.join(", ") : ""
-                            visible: text !== ""
-                            color: activeTheme ? root.onTertiaryContainerColor : Color.mOnSurfaceVariant
-                            pointSize: Style.fontSizeXS
-                            applyUiScale: false
-                            elide: Text.ElideRight
-                            Layout.fillWidth: true
-                          }
-
-                          NText {
-                            text: [themeItem.groupName || "", root.themeMetaLine(themeItem)].filter(function(part) { return String(part || "") !== ""; }).join(" • ")
-                            color: activeTheme ? root.onTertiaryContainerColor : Color.mOnSurfaceVariant
-                            pointSize: Style.fontSizeXS
-                            applyUiScale: false
-                            elide: Text.ElideRight
-                            Layout.fillWidth: true
+                          MouseArea {
+                            anchors.fill: parent
+                            acceptedButtons: Qt.LeftButton
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: root.openThemeInMpv(themeItem)
                           }
                         }
-
-                        NButton {
-                          text: "Play"
-                          enabled: !!themeItem.bestVideoUrl
-                          onClicked: root.openThemeInMpv(themeItem)
-                        }
-
-                        NButton {
-                          text: "Open page"
-                          enabled: !!themeItem.pageUrl
-                          onClicked: root.openUrl(themeItem.pageUrl)
-                        }
-                      }
-
-                      MouseArea {
-                        anchors.fill: parent
-                        acceptedButtons: Qt.LeftButton
-                        cursorShape: Qt.PointingHandCursor
-                        onClicked: root.openThemeInMpv(themeItem)
-                      }
                       }
                     }
                   }
                 }
               }
             }
-
           }
         }
       }
+      }
     }
   }
-}
-
-}

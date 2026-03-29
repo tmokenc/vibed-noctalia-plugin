@@ -46,7 +46,7 @@ Item {
       "ani_base = 'https://graphql.anilist.co'",
       "headers = {'User-Agent': user_agent, 'Accept': 'application/json', 'Content-Type': 'application/json'}",
       "payload = json.dumps({",
-      "  'query': 'query ($search: String, $page: Int, $perPage: Int) { Page(page: $page, perPage: $perPage) { media(search: $search, type: ANIME, sort: SEARCH_MATCH) { id siteUrl title { romaji english native } synonyms season seasonYear format status description(asHtml: false) episodes duration averageScore meanScore popularity favourites genres countryOfOrigin hashtag bannerImage coverImage { large medium } startDate { year month day } endDate { year month day } studios(isMain: true) { nodes { name } } } } }',",
+      "  'query': 'query ($search: String, $page: Int, $perPage: Int) { Page(page: $page, perPage: $perPage) { media(search: $search, type: ANIME, sort: SEARCH_MATCH) { id siteUrl title { romaji english native } synonyms season seasonYear format status description(asHtml: false) episodes duration averageScore meanScore popularity favourites genres countryOfOrigin hashtag source isAdult bannerImage coverImage { large medium } startDate { year month day } endDate { year month day } studios(isMain: true) { nodes { name } } } } }',",
       "  'variables': {'search': query, 'page': 1, 'perPage': page_size}",
       "}).encode('utf-8')",
       "request = urllib.request.Request(ani_base, data=payload, headers=headers)",
@@ -185,19 +185,43 @@ Item {
       return null;
     var cover = media && media.coverImage ? (media.coverImage.large || media.coverImage.medium || "") : "";
     var pageUrl = "https://anilist.co/anime/" + anilistId;
+    var studios = media && media.studios && Array.isArray(media.studios.nodes) ? media.studios.nodes.map(function(node) {
+      return String(node && node.name || "");
+    }).filter(function(name) {
+      return name !== "";
+    }) : [];
     return {
       "id": anilistId,
       "anilistId": anilistId,
       "slug": "",
       "name": titleFromMedia(media),
+      "titleRomaji": String(media && media.title && media.title.romaji || ""),
+      "titleEnglish": String(media && media.title && media.title.english || ""),
+      "titleNative": String(media && media.title && media.title.native || ""),
       "year": parseInt(media && media.seasonYear || 0, 10) || 0,
       "season": String(media && media.season || ""),
       "mediaFormat": String(media && media.format || "").replace(/_/g, " "),
+      "status": String(media && media.status || "").replace(/_/g, " "),
       "synopsis": String(media && media.description || ""),
       "coverUrl": supportedImageUrl(cover, apiBaseUrl),
+      "bannerUrl": supportedImageUrl(media && media.bannerImage || "", apiBaseUrl),
       "pageUrl": pageUrl,
-      "studios": [],
+      "episodes": parseInt(media && media.episodes || 0, 10) || 0,
+      "duration": parseInt(media && media.duration || 0, 10) || 0,
+      "averageScore": parseInt(media && media.averageScore || 0, 10) || 0,
+      "meanScore": parseInt(media && media.meanScore || 0, 10) || 0,
+      "popularity": parseInt(media && media.popularity || 0, 10) || 0,
+      "favourites": parseInt(media && media.favourites || 0, 10) || 0,
+      "genres": Array.isArray(media && media.genres) ? media.genres.filter(function(v) { return String(v || "") !== ""; }) : [],
+      "countryOfOrigin": String(media && media.countryOfOrigin || ""),
+      "hashtag": String(media && media.hashtag || ""),
+      "source": String(media && media.source || "").replace(/_/g, " "),
+      "isAdult": !!(media && media.isAdult),
+      "startDate": media && media.startDate ? media.startDate : {},
+      "endDate": media && media.endDate ? media.endDate : {},
+      "studios": studios,
       "resources": [{ "site": "AniList", "externalId": anilistId, "link": pageUrl }],
+      "synonyms": Array.isArray(media && media.synonyms) ? media.synonyms.filter(function(v) { return String(v || "") !== ""; }) : [],
       "animethemes": [],
       "characters": [],
       "openingCount": 0,
@@ -281,6 +305,15 @@ Item {
     return "";
   }
 
+  function characterRolePriority(role) {
+    var normalized = String(role || "").toUpperCase();
+    if (normalized === "MAIN")
+      return 0;
+    if (normalized === "SUPPORTING")
+      return 1;
+    return 2;
+  }
+
   function mapCharacterEntries(edges) {
     var list = Array.isArray(edges) ? edges : [];
     return list.map(function(edge) {
@@ -306,6 +339,11 @@ Item {
       };
     }).filter(function(entry) {
       return entry.id !== "" || entry.name !== "";
+    }).sort(function(a, b) {
+      var roleDiff = characterRolePriority(a.role) - characterRolePriority(b.role);
+      if (roleDiff !== 0)
+        return roleDiff;
+      return String(a.name || "").localeCompare(String(b.name || ""));
     });
   }
 

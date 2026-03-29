@@ -20,6 +20,7 @@
   "animethemes": {
     "pageSize": 12,
     "recentSearchLimit": 20,
-    "mpvCommand": "mpv"
+    "mpvCommand": "mpv",
+    "onAnimeChangeTabBehavior": "info"
   }
 }

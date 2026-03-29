@@ -29,6 +29,7 @@ ColumnLayout {
   property int editAnimeThemesPageSize: pluginApi?.pluginSettings?.animethemes?.pageSize ?? pluginApi?.manifest?.metadata?.defaultSettings?.animethemes?.pageSize ?? 12
   property int editAnimeThemesRecentSearchLimit: pluginApi?.pluginSettings?.animethemes?.recentSearchLimit ?? pluginApi?.manifest?.metadata?.defaultSettings?.animethemes?.recentSearchLimit ?? 20
   property string editAnimeThemesMpvCommand: pluginApi?.pluginSettings?.animethemes?.mpvCommand || pluginApi?.manifest?.metadata?.defaultSettings?.animethemes?.mpvCommand || "mpv"
+  property string editAnimeThemesOnAnimeChangeTabBehavior: pluginApi?.pluginSettings?.animethemes?.onAnimeChangeTabBehavior || pluginApi?.manifest?.metadata?.defaultSettings?.animethemes?.onAnimeChangeTabBehavior || "info"
 
   spacing: Style.marginM
 
@@ -279,6 +280,19 @@ ColumnLayout {
     }
   }
 
+  NComboBox {
+    Layout.fillWidth: true
+    label: "On anime change"
+    description: "Choose whether selecting another anime jumps to Info or stays on the current right-side tab"
+    model: [
+      { "key": "info", "name": "Open Info tab" },
+      { "key": "keep", "name": "Keep current tab" }
+    ]
+    currentKey: root.editAnimeThemesOnAnimeChangeTabBehavior
+    onSelected: function(key) { root.editAnimeThemesOnAnimeChangeTabBehavior = key; }
+    defaultValue: "info"
+  }
+
   NTextInput {
     Layout.fillWidth: true
     label: "MPV command"
@@ -317,6 +331,7 @@ ColumnLayout {
     pluginApi.pluginSettings.animethemes.pageSize = root.editAnimeThemesPageSize;
     pluginApi.pluginSettings.animethemes.recentSearchLimit = root.editAnimeThemesRecentSearchLimit;
     pluginApi.pluginSettings.animethemes.mpvCommand = root.editAnimeThemesMpvCommand;
+    pluginApi.pluginSettings.animethemes.onAnimeChangeTabBehavior = root.editAnimeThemesOnAnimeChangeTabBehavior;
 
     pluginApi.saveSettings();
     Logger.i("AnimeCorner", "Settings saved successfully");
